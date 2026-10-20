@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bipinho — Acesso Administrativo</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+    body {
+      background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 50%, #06b6d4 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .login-card {
+      background: #ffffff;
+      border-radius: 24px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.25);
+      width: 100%;
+      max-width: 420px;
+      padding: 40px 32px;
+      text-align: center;
+    }
+    .logo-container {
+      margin-bottom: 24px;
+    }
+    .logo-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 80px;
+      height: 80px;
+      background: linear-gradient(135deg, #fbbf24, #f59e0b);
+      border-radius: 24px;
+      box-shadow: 0 10px 20px rgba(245, 158, 11, 0.4);
+      margin-bottom: 12px;
+      font-size: 38px;
+    }
+    h1 {
+      color: #1e293b;
+      font-size: 28px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+    }
+    p.subtitle {
+      color: #64748b;
+      font-size: 14px;
+      margin-top: 6px;
+    }
+    form {
+      margin-top: 28px;
+      text-align: left;
+    }
+    .form-group {
+      margin-bottom: 20px;
+    }
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: #475569;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .input-wrapper {
+      position: relative;
+    }
+    input[type="password"], input[type="text"] {
+      width: 100%;
+      padding: 14px 16px;
+      border: 2px solid #e2e8f0;
+      border-radius: 14px;
+      font-size: 16px;
+      color: #0f172a;
+      outline: none;
+      transition: all 0.2s ease;
+    }
+    input:focus {
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15);
+    }
+    .btn-submit {
+      width: 100%;
+      background: linear-gradient(135deg, #2563eb, #1d4ed8);
+      color: white;
+      border: none;
+      padding: 15px;
+      border-radius: 14px;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 8px 16px rgba(37, 99, 235, 0.3);
+      transition: all 0.2s ease;
+      margin-top: 8px;
+    }
+    .btn-submit:hover {
+      background: linear-gradient(135deg, #1d4ed8, #1e40af);
+      transform: translateY(-1px);
+      box-shadow: 0 12px 20px rgba(37, 99, 235, 0.4);
+    }
+    .btn-submit:active {
+      transform: translateY(1px);
+    }
+    .alert-error {
+      background: #fee2e2;
+      color: #b91c1c;
+      padding: 12px;
+      border-radius: 12px;
+      font-size: 14px;
+      margin-bottom: 18px;
+      text-align: center;
+      font-weight: 500;
+      border: 1px solid #fecaca;
+    }
+    .footer-links {
+      margin-top: 24px;
+      text-align: center;
+    }
+    .footer-links a {
+      color: #64748b;
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 500;
+    }
+    .footer-links a:hover {
+      color: #2563eb;
+      text-decoration: underline;
+    }
+    .default-hint {
+      margin-top: 16px;
+      font-size: 12px;
+      color: #94a3b8;
+      text-align: center;
+      background: #f8fafc;
+      padding: 8px;
+      border-radius: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="login-card">
+    <div class="logo-container">
+      <div class="logo-badge">📺</div>
+      <h1>Bipinho</h1>
+      <p class="subtitle">Área Administrativa & Configurações</p>
+    </div>
+
+    <!-- ERROR_MESSAGE -->
+
+    <form method="POST" action="/admin/login">
+      <div class="form-group">
+        <label for="password">Senha de Acesso</label>
+        <div class="input-wrapper">
+          <input type="password" id="password" name="password" placeholder="Digite a senha" required autofocus>
+        </div>
+      </div>
+      <button type="submit" class="btn-submit">Entrar no Painel</button>
+    </form>
+
+    <div class="default-hint">
+      Senha padrão inicial: <strong>bipinho123</strong>
+    </div>
+
+    <div class="footer-links">
+      <a href="/">← Ir para Tela da TV</a>
+    </div>
+  </div>
+</body>
+</html>

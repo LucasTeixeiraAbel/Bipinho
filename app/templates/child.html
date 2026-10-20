@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Bipinho</title>
+  <link rel="stylesheet" href="/static/css/child.css">
+</head>
+<body class="tv-mode">
+  <!-- Invisible input for barcode scanner -->
+  <input 
+    type="text" 
+    id="barcode-input" 
+    autocomplete="off" 
+    autocorrect="off" 
+    autocapitalize="off" 
+    spellcheck="false" 
+    aria-hidden="true" 
+    tabindex="-1"
+  />
+
+  <div id="app-container">
+    <!-- Top Progress Bar with Stars -->
+    <header id="top-bar">
+      <div class="stars-wrapper" id="stars-container">
+        <!-- Rendered dynamically according to max_scans -->
+      </div>
+      <div id="session-counter" class="session-label"></div>
+    </header>
+
+    <!-- Main Viewport -->
+    <main id="viewport">
+      <!-- 1. WELCOME SCREEN -->
+      <section id="welcome-screen" class="view-layer active">
+        <div class="welcome-content">
+          <div class="mascot-icon">
+            <svg class="tv-mascot-svg" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="15" y="25" width="90" height="70" rx="20" fill="#3B82F6"/>
+              <rect x="25" y="35" width="70" height="50" rx="12" fill="#E0F2FE"/>
+              <!-- Happy Face -->
+              <circle cx="45" cy="55" r="5" fill="#1E3A8A"/>
+              <circle cx="75" cy="55" r="5" fill="#1E3A8A"/>
+              <path d="M50 67 C55 75, 65 75, 70 67" stroke="#1E3A8A" stroke-width="4" stroke-linecap="round"/>
+              <!-- Antennas -->
+              <line x1="60" y1="25" x2="40" y2="10" stroke="#F59E0B" stroke-width="5" stroke-linecap="round"/>
+              <circle cx="38" cy="9" r="5" fill="#EF4444"/>
+              <line x1="60" y1="25" x2="80" y2="10" stroke="#F59E0B" stroke-width="5" stroke-linecap="round"/>
+              <circle cx="82" cy="9" r="5" fill="#10B981"/>
+            </svg>
+          </div>
+          <h1 class="brand-title">Bipinho</h1>
+          <p class="brand-tagline">Bipe seu desenho favorito para assistir!</p>
+          <div class="scan-prompt">
+            <span class="prompt-icon">🏷️</span>
+            <span>Aproxime o cartão do leitor</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2. MEDIA DISPLAY (VIDEO OR IMAGE) -->
+      <section id="media-screen" class="view-layer">
+        <div class="media-wrapper">
+          <video id="tv-video" playsinline preload="auto"></video>
+          <img id="tv-image" alt="Desenho Infantil" />
+        </div>
+
+        <!-- Floating Metadata Card (Title, Author, Date) -->
+        <div id="meta-overlay" class="meta-card">
+          <div class="meta-icon">🎬</div>
+          <div class="meta-details">
+            <h2 id="meta-title">Título do Desenho</h2>
+            <p id="meta-author-date">Autor • Data</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3. COLORING TIME PAUSE SCREEN -->
+      <section id="pause-screen" class="view-layer">
+        <div class="pause-content">
+          <div class="coloring-mascot">
+            <span class="mascot-big-emoji">🎨</span>
+          </div>
+          <h1 class="pause-title">Hora de colorir!</h1>
+          <p class="pause-subtitle">Descanse os olhinhos e solte a imaginação no papel!</p>
+          
+          <!-- Visual Countdown / Progress -->
+          <div class="timer-box">
+            <div class="hourglass-anim">⏳</div>
+            <div class="progress-bar-container">
+              <div id="pause-progress-bar" class="progress-bar-fill"></div>
+            </div>
+            <div id="pause-time-label" class="time-label">18 minutos restantes</div>
+          </div>
+
+          <div id="pause-scan-warning" class="pause-friendly-warning">
+            Ainda estamos colorindo! O Bipinho volta logo...
+          </div>
+        </div>
+      </section>
+
+      <!-- 4. FRIENDLY UNKNOWN CODE TOAST -->
+      <div id="error-toast" class="error-toast-layer">
+        <div class="error-toast-card">
+          <div class="error-toast-icon">🔍</div>
+          <div class="error-toast-text">
+            <h3>Ops!</h3>
+            <p id="error-message-text">Esse desenho não está aqui!</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- 5. UNLOCK CELEBRATION OVERLAY -->
+      <div id="unlock-toast" class="unlock-toast-layer">
+        <div class="unlock-toast-card">
+          <div class="unlock-toast-icon">✨</div>
+          <h3>Liberado pelos pais!</h3>
+          <p>Bipinho pronto para um novo desenho!</p>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="/static/js/child.js"></script>
+</body>
+</html>

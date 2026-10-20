@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bipinho — Painel de Controle</title>
+  <link rel="stylesheet" href="/static/css/admin.css">
+</head>
+<body>
+  <div class="admin-wrapper">
+    <!-- Top Header -->
+    <header class="admin-header">
+      <div class="header-brand">
+        <div class="brand-icon">📺</div>
+        <div>
+          <h1>Bipinho</h1>
+          <span class="brand-sub">Painel de Controle & Cadastro</span>
+        </div>
+      </div>
+      <div class="header-actions">
+        <!-- Quick Simulate Scan -->
+        <div class="quick-scan-box">
+          <input type="text" id="sim-code-input" placeholder="Código (ex: BIP-1001)" />
+          <button id="btn-simulate-scan" class="btn btn-secondary">Simular Bipe na TV 📡</button>
+        </div>
+        <a href="/admin/logout" class="btn btn-logout" title="Sair do painel">Sair</a>
+      </div>
+    </header>
+
+    <!-- TV Connection Banner (Prominent Address) -->
+    <section class="tv-banner">
+      <div class="tv-banner-left">
+        <div class="tv-banner-icon">📡</div>
+        <div class="tv-banner-info">
+          <h2>Endereço para abrir na TV</h2>
+          <p>Digite exatamente este endereço no navegador da sua TV Android:</p>
+          <div class="tv-url-display">
+            <span id="tv-url-text">http://carregando...</span>
+            <button id="btn-copy-url" class="btn-copy">Copiar</button>
+          </div>
+        </div>
+      </div>
+      <div class="tv-banner-right">
+        <div class="status-pill online">
+          <span class="dot"></span> Servidor Ativo (0.0.0.0)
+        </div>
+        <div class="status-pill profile" id="active-profile-pill">
+          Leitor: <strong>USB</strong>
+        </div>
+      </div>
+    </section>
+
+    <!-- Navigation Tabs -->
+    <nav class="admin-tabs">
+      <button class="tab-btn active" data-tab="tab-media">🎨 Desenhos e Mídias</button>
+      <button class="tab-btn" data-tab="tab-settings">⚙️ Configurações Gerais</button>
+      <button class="tab-btn" data-tab="tab-reader">🏷️ Leitor de Código</button>
+      <button class="tab-btn" data-tab="tab-tester">⚡ Testar Leitor</button>
+      <button class="tab-btn" data-tab="tab-stats">📊 Estatísticas & Favoritos</button>
+    </nav>
+
+    <!-- Main Content Area -->
+    <main class="admin-main">
+      <!-- ================= TAB 1: MEDIA ================= -->
+      <section id="tab-media" class="tab-pane active">
+        <div class="pane-header">
+          <div>
+            <h2>Cadastro de Desenhos</h2>
+            <p>Adicione vídeos (MP4) ou imagens que a criança assistirá ao bipar.</p>
+          </div>
+          <a href="/admin/imprimir" target="_blank" class="btn btn-primary btn-print-sheet">
+            🖨️ Imprimir Folha A4 de Códigos
+          </a>
+        </div>
+
+        <!-- Add Form -->
+        <div class="card add-form-card">
+          <h3>Cadastrar Novo Desenho</h3>
+          <form id="form-add-item" enctype="multipart/form-data">
+            <div class="form-row">
+              <div class="form-group flex-2">
+                <label for="item-title">Título do Desenho *</label>
+                <input type="text" id="item-title" name="title" placeholder="Ex: O Ursinho Curioso" required>
+              </div>
+              <div class="form-group flex-1">
+                <label for="item-author">Autor / Estúdio</label>
+                <input type="text" id="item-author" name="author" placeholder="Ex: Lucas / Canal Kids" value="Família">
+              </div>
+              <div class="form-group flex-1">
+                <label for="item-date">Data</label>
+                <input type="date" id="item-date" name="date" required>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group flex-1">
+                <label for="item-code">Código de Barras</label>
+                <div class="input-with-button">
+                  <input type="text" id="item-code" name="code" placeholder="Ex: BIP-1001">
+                  <button type="button" id="btn-auto-code" class="btn btn-outline" title="Gerar próximo código sequencial">
+                    Gerar Automático
+                  </button>
+                </div>
+                <small class="field-hint">Deixe em branco para gerar automaticamente.</small>
+              </div>
+              <div class="form-group flex-2">
+                <label for="item-file">Arquivo de Mídia (Vídeo MP4 ou Imagem JPG/PNG) *</label>
+                <input type="file" id="item-file" name="file" accept="video/*,image/*" required>
+                <small class="field-hint">Formatos suportados: MP4, MKV, AVI, MOV, JPG, PNG, WEBP, GIF. Vídeos não-MP4 serão convertidos automaticamente.</small>
+              </div>
+            </div>
+
+            <div class="form-actions">
+              <button type="submit" id="btn-submit-item" class="btn btn-success">
+                Salvar Desenho
+              </button>
+              <div id="upload-status" class="status-msg"></div>
+            </div>
+          </form>
+        </div>
+
+        <!-- Media List Grid -->
+        <div class="media-list-section">
+          <h3>Desenhos Cadastrados (<span id="items-count">0</span>)</h3>
+          <div id="items-grid" class="items-grid">
+            <!-- Populated via JS -->
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= TAB 2: SETTINGS ================= -->
+      <section id="tab-settings" class="tab-pane">
+        <div class="pane-header">
+          <div>
+            <h2>Configurações da Sessão e Pausa</h2>
+            <p>Controle os limites de tempo, regras de colorir e segurança.</p>
+          </div>
+        </div>
+
+        <form id="form-settings" class="card">
+          <div class="settings-group">
+            <h3>Sessão & Limites da Criança</h3>
+            <div class="form-row">
+              <div class="form-group flex-1">
+                <label for="cfg-max-scans">Limite de Leituras por Sessão (Estrelas)</label>
+                <input type="number" id="cfg-max-scans" min="1" max="10" value="3" required>
+                <small class="field-hint">Número de estrelas que a criança ganha antes da pausa (padrão: 3).</small>
+              </div>
+              <div class="form-group flex-1">
+                <label for="cfg-pause-minutes">Duração da Pausa "Hora de colorir" (minutos)</label>
+                <input type="number" id="cfg-pause-minutes" min="1" max="120" value="18" required>
+                <small class="field-hint">Tempo do cronômetro visual na TV (padrão: 18 min).</small>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group flex-1">
+                <label>Modo de Contagem do Progresso</label>
+                <div class="radio-cards">
+                  <label class="radio-card">
+                    <input type="radio" name="count_mode" value="leituras" checked>
+                    <div class="radio-text">
+                      <strong>Por Leituras (Padrão)</strong>
+                      <span>A criança pode repetir o mesmo desenho e cada bipe acende uma estrela.</span>
+                    </div>
+                  </label>
+                  <label class="radio-card">
+                    <input type="radio" name="count_mode" value="desenhos_diferentes">
+                    <div class="radio-text">
+                      <strong>Por Desenhos Diferentes</strong>
+                      <span>Repetir o mesmo desenho toca o vídeo, mas só avança a estrela ao bipar um desenho novo.</span>
+                    </div>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group flex-1">
+                <label>Modo de Liberação da Pausa</label>
+                <div class="radio-cards">
+                  <label class="radio-card">
+                    <input type="radio" name="pause_unlock_mode" value="ambas" checked>
+                    <div class="radio-text">
+                      <strong>Ambas (Recomendado)</strong>
+                      <span>Libera sozinha ao fim do tempo OU imediatamente pelo código dos pais.</span>
+                    </div>
+                  </label>
+                  <label class="radio-card">
+                    <input type="radio" name="pause_unlock_mode" value="tempo">
+                    <div class="radio-text">
+                      <strong>Automática ao fim do tempo</strong>
+                      <span>A pausa só termina quando o cronômetro zerar.</span>
+                    </div>
+                  </label>
+                  <label class="radio-card">
+                    <input type="radio" name="pause_unlock_mode" value="codigo_pais">
+                    <div class="radio-text">
+                      <strong>Só por código dos pais</strong>
+                      <span>Fica na tela de colorir até os pais biparem o código secreto.</span>
+                    </div>
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-group">
+            <h3>Comportamento & Som</h3>
+            <div class="form-row">
+              <div class="form-group flex-1">
+                <label for="cfg-debounce">Tempo para Ignorar Bipe Repetido (segundos)</label>
+                <input type="number" id="cfg-debounce" min="1" max="30" value="3" required>
+                <small class="field-hint">Evita leituras duplas acidentais ao bipar rápido (padrão: 3 s).</small>
+              </div>
+              <div class="form-group flex-1">
+                <label for="cfg-title-time">Tempo de Exibição das Informações na TV (segundos)</label>
+                <input type="number" id="cfg-title-time" min="5" max="120" value="30" required>
+                <small class="field-hint">Duração que o card discreto com título/autor fica visível (padrão: 30 s).</small>
+              </div>
+              <div class="form-group flex-1">
+                <label for="cfg-sound">Efeitos Sonoros na TV</label>
+                <select id="cfg-sound">
+                  <option value="1">Ligado (Sons alegres ao bipar e liberar)</option>
+                  <option value="0">Desligado (Modo silencioso)</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-group">
+            <h3>Códigos Especiais</h3>
+            <div class="form-row">
+              <div class="form-group flex-1">
+                <label for="cfg-parent-code">Código Secreto dos Pais (Liberar Pausa)</label>
+                <input type="text" id="cfg-parent-code" value="PAIS-LIBERAR-99" required>
+                <small class="field-hint">Bipando este código, a pausa é encerrada na hora e as estrelas são zeradas.</small>
+              </div>
+              <div class="form-group flex-1">
+                <label for="cfg-surprise-code">Código "Surpresa" (Desenho Aleatório)</label>
+                <input type="text" id="cfg-surprise-code" value="BIP-SURPRESA" required>
+                <small class="field-hint">Código de barras que escolhe um desenho aleatório da coleção.</small>
+              </div>
+              <div class="form-group flex-1">
+                <label for="cfg-surprise-toggle">Ativar Código Surpresa</label>
+                <select id="cfg-surprise-toggle">
+                  <option value="1">Ativado</option>
+                  <option value="0">Desativado</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" class="btn btn-success">Salvar Configurações Gerais</button>
+            <span id="settings-status" class="status-msg"></span>
+          </div>
+        </form>
+
+        <!-- Change Password Box -->
+        <div class="card mt-24">
+          <h3>Segurança da Administração</h3>
+          <p class="subtitle">Troque a senha de acesso a este painel.</p>
+          <form id="form-password">
+            <div class="form-row">
+              <div class="form-group flex-1">
+                <label for="pwd-current">Senha Atual</label>
+                <input type="password" id="pwd-current" required>
+              </div>
+              <div class="form-group flex-1">
+                <label for="pwd-new">Nova Senha</label>
+                <input type="password" id="pwd-new" required minlength="4">
+              </div>
+              <div class="form-group flex-1">
+                <label for="pwd-confirm">Confirmar Nova Senha</label>
+                <input type="password" id="pwd-confirm" required minlength="4">
+              </div>
+            </div>
+            <div class="form-actions">
+              <button type="submit" class="btn btn-secondary">Alterar Senha</button>
+              <span id="password-status" class="status-msg"></span>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <!-- ================= TAB 3: BARCODE READER PROFILE ================= -->
+      <section id="tab-reader" class="tab-pane">
+        <div class="pane-header">
+          <div>
+            <h2>Configurações do Leitor de Código de Barras</h2>
+            <p>Selecione a conexão do leitor usado na TV. As alterações valem na hora sem reiniciar o servidor.</p>
+          </div>
+        </div>
+
+        <div class="card">
+          <!-- Reader Type Selector -->
+          <h3>Tipo de Conexão do Leitor</h3>
+          <div class="reader-selector-grid">
+            <label class="reader-type-card" id="card-type-usb">
+              <input type="radio" name="reader_type" value="USB" checked>
+              <div class="reader-icon">🔌</div>
+              <h4>USB com Fio</h4>
+              <p>Conectado diretamente na porta USB da TV. Resposta rápida e máxima estabilidade.</p>
+              <span class="badge">Padrão</span>
+            </label>
+
+            <label class="reader-type-card" id="card-type-24g">
+              <input type="radio" name="reader_type" value="2.4G">
+              <div class="reader-icon">📶</div>
+              <h4>Sem Fio 2.4G</h4>
+              <p>Com dongle USB plugado na TV. Excelente alcance e velocidade.</p>
+            </label>
+
+            <label class="reader-type-card" id="card-type-bt">
+              <input type="radio" name="reader_type" value="Bluetooth">
+              <div class="reader-icon">🔵</div>
+              <h4>Bluetooth</h4>
+              <p>Pareado diretamente na TV. Tolerância ampliada para latências e economia de energia.</p>
+            </label>
+          </div>
+
+          <!-- Dynamic Contextual Tip -->
+          <div class="reader-tip-box" id="reader-tip-display">
+            <span class="tip-icon">💡</span>
+            <div class="tip-text">
+              <strong>Dica para este leitor:</strong>
+              <p id="tip-text-content">Se nada acontecer ao bipar, desconecte e reconecte o cabo na TV.</p>
+            </div>
+          </div>
+
+          <!-- Profile Parameters -->
+          <h3 class="mt-24">Parâmetros Detalhados do Perfil Ativo</h3>
+          <form id="form-reader-profile">
+            <div class="form-row">
+              <div class="form-group flex-1">
+                <label for="cfg-interchar">Tempo Máximo Entre Caracteres (ms)</label>
+                <input type="number" id="cfg-interchar" min="20" max="1000" value="100" required>
+                <small class="field-hint">100 ms para USB/2.4G; 300 ms para Bluetooth.</small>
+              </div>
+              <div class="form-group flex-1">
+                <label for="cfg-terminator">Terminador da Leitura</label>
+                <select id="cfg-terminator">
+                  <option value="Enter">Enter (Padrão da maioria dos leitores)</option>
+                  <option value="Tab">Tab</option>
+                </select>
+                <small class="field-hint">Tecla enviada pelo leitor ao final do código.</small>
+              </div>
+              <div class="form-group flex-1">
+                <label for="cfg-min-len">Tamanho Mínimo do Código</label>
+                <input type="number" id="cfg-min-len" min="1" max="20" value="3" required>
+                <small class="field-hint">Descarta leituras menores que este número.</small>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group flex-1">
+                <label for="cfg-prefix">Prefixo a Remover</label>
+                <input type="text" id="cfg-prefix" placeholder="Opcional (ex: ~)">
+                <small class="field-hint">Remove caracteres fixos no início do código se o leitor enviar.</small>
+              </div>
+              <div class="form-group flex-1">
+                <label for="cfg-suffix">Sufixo a Remover</label>
+                <input type="text" id="cfg-suffix" placeholder="Opcional">
+                <small class="field-hint">Remove caracteres fixos no final do código.</small>
+              </div>
+              <div class="form-group flex-1">
+                <label for="cfg-timeout">Tempo para Descartar Incompleta (ms)</label>
+                <input type="number" id="cfg-timeout" min="100" max="3000" value="500" required>
+                <small class="field-hint">Limpa a memória se a leitura for interrompida.</small>
+              </div>
+            </div>
+
+            <div class="form-actions">
+              <button type="submit" class="btn btn-success">Salvar Perfil do Leitor</button>
+              <span id="reader-status" class="status-msg"></span>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <!-- ================= TAB 4: TEST READER ================= -->
+      <section id="tab-tester" class="tab-pane">
+        <div class="pane-header">
+          <div>
+            <h2>Diagnóstico e Teste do Leitor de Código</h2>
+            <p>Conecte o leitor a este computador (ou teste direto) para analisar a velocidade e os caracteres recebidos.</p>
+          </div>
+        </div>
+
+        <div class="card tester-card">
+          <div class="tester-input-zone" id="tester-focus-zone">
+            <div class="pulse-scan-icon">🏷️</div>
+            <h3>Área de Teste Ativa</h3>
+            <p>Aproxime o leitor e bipe qualquer código de barras para testar em tempo real:</p>
+            <input type="text" id="tester-input" placeholder="Clique aqui se o leitor não responder..." autofocus>
+          </div>
+
+          <div class="tester-results-grid">
+            <div class="result-box">
+              <span class="result-label">Código Bruto Recebido</span>
+              <span class="result-value code-font" id="res-raw">-</span>
+            </div>
+            <div class="result-box">
+              <span class="result-label">Terminador Detectado</span>
+              <span class="result-value" id="res-term">-</span>
+            </div>
+            <div class="result-box">
+              <span class="result-label">Código Limpo Processado</span>
+              <span class="result-value code-font highlight" id="res-clean">-</span>
+            </div>
+            <div class="result-box">
+              <span class="result-label">Tempo Médio / Máx Inter-Caractere</span>
+              <span class="result-value" id="res-timing">-</span>
+            </div>
+          </div>
+
+          <div class="tester-log-box">
+            <h4>Registro Detalhado dos Intervalos entre Teclas</h4>
+            <div id="tester-key-log" class="key-log-container">
+              <span class="empty-log">Aguardando primeira leitura...</span>
+            </div>
+          </div>
+
+          <div id="tester-diagnosis-badge" class="diagnosis-badge neutral">
+            Status: Aguardando bipe
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= TAB 5: STATS ================= -->
+      <section id="tab-stats" class="tab-pane">
+        <div class="pane-header">
+          <div>
+            <h2>Estatísticas & Favoritos</h2>
+            <p>Acompanhe os desenhos mais assistidos pela criança.</p>
+          </div>
+          <button id="btn-reset-session" class="btn btn-outline" title="Zera as estrelas e remove a pausa atual na TV">
+            🔄 Reiniciar Sessão na TV
+          </button>
+        </div>
+
+        <div class="stats-cards-row">
+          <div class="stat-card">
+            <span class="stat-number" id="stat-total-items">0</span>
+            <span class="stat-title">Desenhos Cadastrados</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-number" id="stat-total-views">0</span>
+            <span class="stat-title">Total de Visualizações</span>
+          </div>
+        </div>
+
+        <div class="card mt-24">
+          <h3>Ranking dos Desenhos Favoritos</h3>
+          <div id="favorites-list" class="favorites-list">
+            <!-- Populated via JS -->
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Modal Edit Item -->
+  <div id="modal-edit" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Editar Desenho</h3>
+        <button class="modal-close" id="btn-close-edit">&times;</button>
+      </div>
+      <form id="form-edit-item" enctype="multipart/form-data">
+        <input type="hidden" id="edit-item-id">
+        <div class="form-group">
+          <label for="edit-title">Título *</label>
+          <input type="text" id="edit-title" required>
+        </div>
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label for="edit-author">Autor</label>
+            <input type="text" id="edit-author" required>
+          </div>
+          <div class="form-group flex-1">
+            <label for="edit-date">Data</label>
+            <input type="date" id="edit-date" required>
+          </div>
+          <div class="form-group flex-1">
+            <label for="edit-code">Código de Barras *</label>
+            <input type="text" id="edit-code" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="edit-file">Substituir Arquivo de Mídia (Opcional)</label>
+          <input type="file" id="edit-file" accept="video/*,image/*">
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline" id="btn-cancel-edit">Cancelar</button>
+          <button type="submit" class="btn btn-success">Salvar Alterações</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal Barcode View -->
+  <div id="modal-barcode" class="modal-overlay">
+    <div class="modal-card barcode-modal-card">
+      <div class="modal-header">
+        <h3 id="barcode-modal-title">Código de Barras</h3>
+        <button class="modal-close" id="btn-close-barcode">&times;</button>
+      </div>
+      <div class="barcode-preview-box">
+        <div id="barcode-svg-container"></div>
+        <span id="barcode-modal-code" class="code-font barcode-big-number"></span>
+      </div>
+      <div class="modal-footer">
+        <a href="/admin/imprimir" target="_blank" class="btn btn-primary">Ir para Folha de Impressão A4</a>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/js/admin.js"></script>
+</body>
+</html>

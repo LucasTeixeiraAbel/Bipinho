@@ -1,0 +1,684 @@
+/**
+ * Bipinho — Admin Dashboard Logic
+ * Handles media CRUD, settings, scanner profiles, live diagnostics, and simulation.
+ */
+
+(function () {
+  "use strict";
+
+  // State
+  let currentSettings = {};
+  let currentItems = [];
+  let currentProfileType = "USB";
+
+  const READER_TIPS = {
+    USB: "Se nada acontecer ao bipar, desconecte e reconecte o cabo na TV.",
+    Bluetooth: "Se o leitor parar de responder, bipe uma vez para acordá-lo ou refaça o pareamento nas configurações da TV.",
+    "2.4G": "Verifique se o receptor USB está bem encaixado na TV."
+  };
+
+  // ----------------- TABS ----------------- //
+  const tabButtons = document.querySelectorAll(".tab-btn");
+  const tabPanes = document.querySelectorAll(".tab-pane");
+
+  tabButtons.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const target = btn.getAttribute("data-tab");
+      tabButtons.forEach((b) => b.classList.remove("active"));
+      tabPanes.forEach((p) => p.classList.remove("active"));
+      btn.classList.add("active");
+      document.getElementById(target).classList.add("active");
+
+      if (target === "tab-stats") loadStats();
+      if (target === "tab-tester") {
+        setTimeout(() => document.getElementById("tester-input").focus(), 100);
+      }
+    });
+  });
+
+  // ----------------- HEADER & TV BANNER ----------------- //
+  function loadAdminInfo() {
+    fetch("/api/admin/info")
+      .then((r) => r.json())
+      .then((info) => {
+        document.getElementById("tv-url-text").textContent = info.tv_url;
+        document.getElementById("active-profile-pill").innerHTML =
+          `Leitor: <strong>${info.reader_type}</strong>`;
+        currentProfileType = info.reader_type;
+        document.getElementById("item-code").placeholder = `Ex: ${info.next_auto_code}`;
+      })
+      .catch((e) => console.error("Error loading admin info:", e));
+  }
+
+  document.getElementById("btn-copy-url").addEventListener("click", () => {
+    const text = document.getElementById("tv-url-text").textContent;
+    navigator.clipboard.writeText(text).then(() => {
+      const btn = document.getElementById("btn-copy-url");
+      btn.textContent = "Copiado! ✓";
+      setTimeout(() => (btn.textContent = "Copiar"), 2000);
+    });
+  });
+
+  // Quick simulate scan from header
+  document.getElementById("btn-simulate-scan").addEventListener("click", () => {
+    const input = document.getElementById("sim-code-input");
+    const code = input.value.trim();
+    if (!code) {
+      alert("Digite um código para simular o bipe!");
+      return;
+    }
+    simulateBip(code);
+  });
+
+  function simulateBip(code) {
+    fetch("/api/admin/simulate-scan", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code: code })
+    })
+      .then((r) => r.json())
+      .then((res) => {
+        if (res.status === "success") {
+          alert(`Bipe simulado com sucesso na TV! Desenho: "${res.item.title}"`);
+        } else if (res.status === "parent_unlock") {
+          alert("Código dos pais simulado: Pausa liberada na TV!");
+        } else if (res.status === "in_pause") {
+          alert("A TV está na Hora de Colorir! Desenhos pausados.");
+        } else if (res.status === "not_found") {
+          alert(`Código desconhecido: "${code}". Aviso exibido na TV.`);
+        } else if (res.status === "debounce_ignored") {
+          alert("Bipe repetido ignorado (intervalo menor que o configurado).");
+        }
+      })
+      .catch((err) => alert("Erro ao simular bipe: " + err));
+  }
+
+  // ----------------- TAB 1: MEDIA CRUD ----------------- //
+
+  // Today's date default
+  const todayIso = new Date().toISOString().split("T")[0];
+  document.getElementById("item-date").value = todayIso;
+
+  document.getElementById("btn-auto-code").addEventListener("click", () => {
+    fetch("/api/admin/info")
+      .then((r) => r.json())
+      .then((info) => {
+        document.getElementById("item-code").value = info.next_auto_code;
+      });
+  });
+
+  function loadItems() {
+    fetch("/api/admin/items")
+      .then((r) => r.json())
+      .then((items) => {
+        currentItems = items;
+        document.getElementById("items-count").textContent = items.length;
+        renderItemsGrid(items);
+      });
+  }
+
+  function renderItemsGrid(items) {
+    const grid = document.getElementById("items-grid");
+    if (!items || items.length === 0) {
+      grid.innerHTML = `
+        <div style="grid-column: 1/-1; text-align: center; padding: 40px; color: #64748b;">
+          <p style="font-size: 18px; font-weight: 600;">Nenhum desenho cadastrado ainda.</p>
+          <p style="font-size: 14px; margin-top: 6px;">Use o formulário acima para adicionar vídeos ou imagens.</p>
+        </div>
+      `;
+      return;
+    }
+
+    grid.innerHTML = items
+      .map((item) => {
+        const thumbUrl = `/media/thumbs/${item.thumb_filename}`;
+        const typeBadge =
+          item.media_type === "video"
+            ? '<span class="badge-media-type video">Vídeo</span>'
+            : '<span class="badge-media-type image">Imagem</span>';
+
+        return `
+        <div class="media-item-card">
+          <div class="media-thumb-wrapper">
+            <img src="${thumbUrl}" alt="${item.title}" onerror="this.src='/static/icons/default_thumb.png'">
+            ${typeBadge}
+            <span class="badge-code">${item.code}</span>
+          </div>
+          <div class="media-item-info">
+            <h4>${item.title}</h4>
+            <div class="media-meta-line">${item.author} • ${formatDate(item.date)}</div>
+            <div class="media-views-count">👀 Visto ${item.view_count || 0} vezes</div>
+          </div>
+          <div class="media-item-actions">
+            <button class="btn btn-secondary btn-xs" onclick="BipinhoAdmin.quickBip('${item.code}')" title="Testar exibição na TV">
+              📡 Bipar na TV
+            </button>
+            <button class="btn btn-outline btn-xs" onclick="BipinhoAdmin.viewBarcode('${item.code}', '${escapeHtml(item.title)}')">
+              🏷️ Código
+            </button>
+            <button class="btn btn-outline btn-xs" onclick="BipinhoAdmin.openEditModal(${item.id})">
+              ✏️
+            </button>
+            <button class="btn btn-danger btn-xs" onclick="BipinhoAdmin.deleteItem(${item.id}, '${escapeHtml(item.title)}')">
+              🗑️
+            </button>
+          </div>
+        </div>
+      `;
+      })
+      .join("");
+  }
+
+  // Create Item Form
+  document.getElementById("form-add-item").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const btn = document.getElementById("btn-submit-item");
+    const status = document.getElementById("upload-status");
+    btn.disabled = true;
+    btn.textContent = "Processando e gerando miniaturas...";
+    status.className = "status-msg";
+    status.textContent = "";
+
+    const formData = new FormData(e.target);
+
+    fetch("/api/admin/items", {
+      method: "POST",
+      body: formData
+    })
+      .then((r) => r.json().then((data) => ({ status: r.status, body: data })))
+      .then(({ status: httpStatus, body }) => {
+        btn.disabled = false;
+        btn.textContent = "Salvar Desenho";
+        if (httpStatus === 200) {
+          status.className = "status-msg success";
+          status.textContent = "Desenho cadastrado com sucesso!";
+          if (body.warning) {
+            alert("Aviso: " + body.warning);
+          }
+          document.getElementById("form-add-item").reset();
+          document.getElementById("item-date").value = todayIso;
+          loadItems();
+          loadAdminInfo();
+        } else {
+          status.className = "status-msg error";
+          status.textContent = body.detail || "Erro ao cadastrar desenho.";
+        }
+      })
+      .catch((err) => {
+        btn.disabled = false;
+        btn.textContent = "Salvar Desenho";
+        status.className = "status-msg error";
+        status.textContent = "Erro na requisição: " + err;
+      });
+  });
+
+  // Edit Modal
+  window.BipinhoAdmin = window.BipinhoAdmin || {};
+
+  window.BipinhoAdmin.openEditModal = function (itemId) {
+    const item = currentItems.find((i) => i.id === itemId);
+    if (!item) return;
+
+    document.getElementById("edit-item-id").value = item.id;
+    document.getElementById("edit-title").value = item.title;
+    document.getElementById("edit-author").value = item.author;
+    document.getElementById("edit-date").value = item.date;
+    document.getElementById("edit-code").value = item.code;
+    document.getElementById("edit-file").value = "";
+
+    document.getElementById("modal-edit").classList.add("active");
+  };
+
+  document.getElementById("btn-close-edit").addEventListener("click", () => {
+    document.getElementById("modal-edit").classList.remove("active");
+  });
+  document.getElementById("btn-cancel-edit").addEventListener("click", () => {
+    document.getElementById("modal-edit").classList.remove("active");
+  });
+
+  document.getElementById("form-edit-item").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const itemId = document.getElementById("edit-item-id").value;
+    const formData = new FormData();
+    formData.append("title", document.getElementById("edit-title").value);
+    formData.append("author", document.getElementById("edit-author").value);
+    formData.append("date", document.getElementById("edit-date").value);
+    formData.append("code", document.getElementById("edit-code").value);
+
+    const fileInput = document.getElementById("edit-file");
+    if (fileInput.files.length > 0) {
+      formData.append("file", fileInput.files[0]);
+    }
+
+    fetch(`/api/admin/items/${itemId}`, {
+      method: "PUT",
+      body: formData
+    })
+      .then((r) => r.json().then((data) => ({ status: r.status, body: data })))
+      .then(({ status, body }) => {
+        if (status === 200) {
+          document.getElementById("modal-edit").classList.remove("active");
+          loadItems();
+        } else {
+          alert(body.detail || "Erro ao atualizar desenho.");
+        }
+      });
+  });
+
+  // Delete Item
+  window.BipinhoAdmin.deleteItem = function (itemId, title) {
+    if (!confirm(`Deseja realmente excluir o desenho "${title}"?`)) return;
+
+    fetch(`/api/admin/items/${itemId}`, { method: "DELETE" })
+      .then((r) => r.json())
+      .then(() => {
+        loadItems();
+      });
+  };
+
+  // Quick Bip
+  window.BipinhoAdmin.quickBip = function (code) {
+    simulateBip(code);
+  };
+
+  // View Barcode
+  window.BipinhoAdmin.viewBarcode = function (code, title) {
+    document.getElementById("barcode-modal-title").textContent = title;
+    document.getElementById("barcode-modal-code").textContent = code;
+    const container = document.getElementById("barcode-svg-container");
+    container.innerHTML = "Carregando código de barras...";
+
+    fetch(`/api/barcode/${encodeURIComponent(code)}.svg`)
+      .then((r) => r.text())
+      .then((svg) => {
+        container.innerHTML = svg;
+      })
+      .catch(() => {
+        container.innerHTML = "Erro ao carregar código de barras.";
+      });
+
+    document.getElementById("modal-barcode").classList.add("active");
+  };
+
+  document.getElementById("btn-close-barcode").addEventListener("click", () => {
+    document.getElementById("modal-barcode").classList.remove("active");
+  });
+
+  // ----------------- TAB 2: SETTINGS ----------------- //
+
+  function loadSettings() {
+    fetch("/api/admin/settings")
+      .then((r) => r.json())
+      .then((cfg) => {
+        currentSettings = cfg;
+        document.getElementById("cfg-max-scans").value = cfg.max_scans || 3;
+        document.getElementById("cfg-pause-minutes").value = cfg.pause_minutes || 18;
+        document.getElementById("cfg-debounce").value = cfg.repeat_debounce_seconds || 3;
+        document.getElementById("cfg-title-time").value = cfg.title_display_seconds || 30;
+        document.getElementById("cfg-sound").value = cfg.sound_enabled || "1";
+        document.getElementById("cfg-parent-code").value = cfg.parent_unlock_code || "PAIS-LIBERAR-99";
+        document.getElementById("cfg-surprise-code").value = cfg.surprise_code || "BIP-SURPRESA";
+        document.getElementById("cfg-surprise-toggle").value = cfg.surprise_enabled || "1";
+
+        // Radio count_mode
+        const countMode = cfg.count_mode || "leituras";
+        const countRadio = document.querySelector(`input[name="count_mode"][value="${countMode}"]`);
+        if (countRadio) countRadio.checked = true;
+
+        // Radio pause_unlock_mode
+        const unlockMode = cfg.pause_unlock_mode || "ambas";
+        const unlockRadio = document.querySelector(`input[name="pause_unlock_mode"][value="${unlockMode}"]`);
+        if (unlockRadio) unlockRadio.checked = true;
+
+        // Reader profile tab
+        updateReaderTabInputs(cfg.reader_type || "USB", cfg);
+      });
+  }
+
+  document.getElementById("form-settings").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const status = document.getElementById("settings-status");
+
+    const payload = {
+      max_scans: document.getElementById("cfg-max-scans").value,
+      pause_minutes: document.getElementById("cfg-pause-minutes").value,
+      count_mode: document.querySelector('input[name="count_mode"]:checked').value,
+      pause_unlock_mode: document.querySelector('input[name="pause_unlock_mode"]:checked').value,
+      repeat_debounce_seconds: document.getElementById("cfg-debounce").value,
+      title_display_seconds: document.getElementById("cfg-title-time").value,
+      sound_enabled: document.getElementById("cfg-sound").value,
+      parent_unlock_code: document.getElementById("cfg-parent-code").value.trim().toUpperCase(),
+      surprise_code: document.getElementById("cfg-surprise-code").value.trim().toUpperCase(),
+      surprise_enabled: document.getElementById("cfg-surprise-toggle").value
+    };
+
+    fetch("/api/admin/settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ settings: payload })
+    })
+      .then((r) => r.json())
+      .then(() => {
+        status.className = "status-msg success";
+        status.textContent = "Configurações salvas com sucesso!";
+        setTimeout(() => (status.textContent = ""), 3000);
+      });
+  });
+
+  // Change Password
+  document.getElementById("form-password").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const status = document.getElementById("password-status");
+    const currentPwd = document.getElementById("pwd-current").value;
+    const newPwd = document.getElementById("pwd-new").value;
+    const confirmPwd = document.getElementById("pwd-confirm").value;
+
+    if (newPwd !== confirmPwd) {
+      status.className = "status-msg error";
+      status.textContent = "A nova senha e a confirmação não conferem.";
+      return;
+    }
+
+    fetch("/api/admin/change-password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        current_password: currentPwd,
+        new_password: newPwd
+      })
+    })
+      .then((r) => r.json().then((d) => ({ ok: r.ok, body: d })))
+      .then(({ ok, body }) => {
+        if (ok) {
+          status.className = "status-msg success";
+          status.textContent = "Senha alterada com sucesso!";
+          document.getElementById("form-password").reset();
+        } else {
+          status.className = "status-msg error";
+          status.textContent = body.detail || "Erro ao alterar senha.";
+        }
+      });
+  });
+
+  // ----------------- TAB 3: BARCODE READER PROFILE ----------------- //
+
+  function updateReaderTabInputs(type, cfg) {
+    currentProfileType = type;
+    const cards = document.querySelectorAll(".reader-type-card");
+    cards.forEach((c) => c.classList.remove("selected"));
+
+    const selectedCard = document.querySelector(
+      `.reader-type-card input[value="${type}"]`
+    );
+    if (selectedCard) {
+      selectedCard.checked = true;
+      selectedCard.closest(".reader-type-card").classList.add("selected");
+    }
+
+    // Update Tip
+    document.getElementById("tip-text-content").textContent =
+      READER_TIPS[type] || "";
+
+    // Set parameters based on type
+    if (type === "Bluetooth") {
+      document.getElementById("cfg-interchar").value =
+        cfg.reader_bt_max_interchar_ms || 300;
+      document.getElementById("cfg-terminator").value =
+        cfg.reader_bt_terminator || "Enter";
+      document.getElementById("cfg-prefix").value =
+        cfg.reader_bt_prefix_strip || "";
+      document.getElementById("cfg-suffix").value =
+        cfg.reader_bt_suffix_strip || "";
+      document.getElementById("cfg-min-len").value =
+        cfg.reader_bt_min_length || 3;
+      document.getElementById("cfg-timeout").value =
+        cfg.reader_bt_timeout_ms || 1000;
+    } else if (type === "2.4G") {
+      document.getElementById("cfg-interchar").value =
+        cfg.reader_24g_max_interchar_ms || 100;
+      document.getElementById("cfg-terminator").value =
+        cfg.reader_24g_terminator || "Enter";
+      document.getElementById("cfg-prefix").value =
+        cfg.reader_24g_prefix_strip || "";
+      document.getElementById("cfg-suffix").value =
+        cfg.reader_24g_suffix_strip || "";
+      document.getElementById("cfg-min-len").value =
+        cfg.reader_24g_min_length || 3;
+      document.getElementById("cfg-timeout").value =
+        cfg.reader_24g_timeout_ms || 500;
+    } else {
+      // USB
+      document.getElementById("cfg-interchar").value =
+        cfg.reader_usb_max_interchar_ms || 100;
+      document.getElementById("cfg-terminator").value =
+        cfg.reader_usb_terminator || "Enter";
+      document.getElementById("cfg-prefix").value =
+        cfg.reader_usb_prefix_strip || "";
+      document.getElementById("cfg-suffix").value =
+        cfg.reader_usb_suffix_strip || "";
+      document.getElementById("cfg-min-len").value =
+        cfg.reader_usb_min_length || 3;
+      document.getElementById("cfg-timeout").value =
+        cfg.reader_usb_timeout_ms || 500;
+    }
+  }
+
+  // Switch reader type immediately without reboot
+  document.querySelectorAll('input[name="reader_type"]').forEach((radio) => {
+    radio.addEventListener("change", (e) => {
+      const newType = e.target.value;
+      updateReaderTabInputs(newType, currentSettings);
+
+      // Save active reader type immediately
+      fetch("/api/admin/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ settings: { reader_type: newType } })
+      })
+        .then((r) => r.json())
+        .then(() => {
+          currentSettings.reader_type = newType;
+          loadAdminInfo();
+        });
+    });
+  });
+
+  // Save detailed profile parameters
+  document.getElementById("form-reader-profile").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const status = document.getElementById("reader-status");
+    const type = currentProfileType;
+
+    const payload = {};
+    if (type === "Bluetooth") {
+      payload.reader_bt_max_interchar_ms = document.getElementById("cfg-interchar").value;
+      payload.reader_bt_terminator = document.getElementById("cfg-terminator").value;
+      payload.reader_bt_prefix_strip = document.getElementById("cfg-prefix").value;
+      payload.reader_bt_suffix_strip = document.getElementById("cfg-suffix").value;
+      payload.reader_bt_min_length = document.getElementById("cfg-min-len").value;
+      payload.reader_bt_timeout_ms = document.getElementById("cfg-timeout").value;
+    } else if (type === "2.4G") {
+      payload.reader_24g_max_interchar_ms = document.getElementById("cfg-interchar").value;
+      payload.reader_24g_terminator = document.getElementById("cfg-terminator").value;
+      payload.reader_24g_prefix_strip = document.getElementById("cfg-prefix").value;
+      payload.reader_24g_suffix_strip = document.getElementById("cfg-suffix").value;
+      payload.reader_24g_min_length = document.getElementById("cfg-min-len").value;
+      payload.reader_24g_timeout_ms = document.getElementById("cfg-timeout").value;
+    } else {
+      payload.reader_usb_max_interchar_ms = document.getElementById("cfg-interchar").value;
+      payload.reader_usb_terminator = document.getElementById("cfg-terminator").value;
+      payload.reader_usb_prefix_strip = document.getElementById("cfg-prefix").value;
+      payload.reader_usb_suffix_strip = document.getElementById("cfg-suffix").value;
+      payload.reader_usb_min_length = document.getElementById("cfg-min-len").value;
+      payload.reader_usb_timeout_ms = document.getElementById("cfg-timeout").value;
+    }
+
+    fetch("/api/admin/settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ settings: payload })
+    })
+      .then((r) => r.json())
+      .then(() => {
+        status.className = "status-msg success";
+        status.textContent = "Parâmetros do perfil salvos com sucesso!";
+        setTimeout(() => (status.textContent = ""), 3000);
+      });
+  });
+
+  // ----------------- TAB 4: TESTER (REAL-TIME DIAGNOSTIC) ----------------- //
+  const testerInput = document.getElementById("tester-input");
+  const testerFocusZone = document.getElementById("tester-focus-zone");
+  let testKeyTimings = [];
+  let testLastCharTime = 0;
+  let testBuffer = "";
+
+  testerFocusZone.addEventListener("click", () => {
+    testerInput.focus();
+  });
+
+  testerInput.addEventListener("focus", () => {
+    testerFocusZone.classList.add("focused");
+  });
+  testerInput.addEventListener("blur", () => {
+    testerFocusZone.classList.remove("focused");
+  });
+
+  testerInput.addEventListener("keydown", (e) => {
+    const now = performance.now();
+    const isTerminator = e.key === "Enter" || e.key === "Tab";
+
+    if (testLastCharTime > 0) {
+      const delta = Math.round(now - testLastCharTime);
+      testKeyTimings.push({ key: e.key, delta: delta });
+    } else {
+      testKeyTimings = [{ key: e.key, delta: 0 }];
+    }
+    testLastCharTime = now;
+
+    if (isTerminator) {
+      e.preventDefault();
+      const raw = testBuffer || testerInput.value;
+      renderDiagnosticResults(raw, e.key, testKeyTimings);
+      testBuffer = "";
+      testerInput.value = "";
+      testLastCharTime = 0;
+      testKeyTimings = [];
+      return;
+    }
+
+    if (e.key.length === 1) {
+      testBuffer += e.key;
+    }
+  });
+
+  function renderDiagnosticResults(raw, terminator, timings) {
+    document.getElementById("res-raw").textContent = raw || "(vazio)";
+    document.getElementById("res-term").textContent = terminator;
+
+    // Clean prefix/suffix
+    let clean = raw;
+    const prefix = document.getElementById("cfg-prefix").value;
+    const suffix = document.getElementById("cfg-suffix").value;
+    if (prefix && clean.startsWith(prefix)) clean = clean.substring(prefix.length);
+    if (suffix && clean.endsWith(suffix)) clean = clean.substring(0, clean.length - suffix.length);
+    document.getElementById("res-clean").textContent = clean;
+
+    // Calculate timings
+    const deltas = timings.slice(1).map((t) => t.delta);
+    if (deltas.length > 0) {
+      const avg = Math.round(deltas.reduce((a, b) => a + b, 0) / deltas.length);
+      const max = Math.max(...deltas);
+      document.getElementById("res-timing").textContent = `${avg} ms méd / ${max} ms máx`;
+
+      // Diagnosis Badge
+      const badge = document.getElementById("tester-diagnosis-badge");
+      if (max <= 100) {
+        badge.className = "diagnosis-badge good";
+        badge.textContent = `Status: Excelente! Leitura ultrarrápida (máx ${max}ms). Perfeito para USB ou 2.4G.`;
+      } else if (max <= 300) {
+        badge.className = "diagnosis-badge good";
+        badge.textContent = `Status: Bom! Leitura em ${max}ms. Compatível com perfil Bluetooth.`;
+      } else {
+        badge.className = "diagnosis-badge warning";
+        badge.textContent = `Status: Intervalo longo detectado (${max}ms). Aumente o "Tempo Máximo Entre Caracteres" se houver falhas.`;
+      }
+    } else {
+      document.getElementById("res-timing").textContent = "N/A";
+    }
+
+    // Render key log pills
+    const logContainer = document.getElementById("tester-key-log");
+    logContainer.innerHTML = timings
+      .map(
+        (t) => `
+        <span class="key-pill">
+          ${t.key === "Enter" ? "↵ Enter" : t.key === "Tab" ? "⇥ Tab" : t.key}
+          <span class="delta">${t.delta}ms</span>
+        </span>
+      `
+      )
+      .join("");
+  }
+
+  // ----------------- TAB 5: STATS ----------------- //
+
+  function loadStats() {
+    fetch("/api/admin/stats")
+      .then((r) => r.json())
+      .then((stats) => {
+        document.getElementById("stat-total-items").textContent = stats.total_items;
+        document.getElementById("stat-total-views").textContent = stats.total_views;
+
+        const favList = document.getElementById("favorites-list");
+        if (!stats.favorites || stats.favorites.length === 0) {
+          favList.innerHTML =
+            "<p style='color: #64748b; font-size: 14px;'>Nenhum desenho foi visto ainda.</p>";
+          return;
+        }
+
+        favList.innerHTML = stats.favorites
+          .map((fav, idx) => `
+            <div class="favorite-row">
+              <span class="fav-rank">#${idx + 1}</span>
+              <img src="/media/thumbs/${fav.thumb_filename}" class="fav-thumb" alt="${fav.title}" onerror="this.style.display='none'">
+              <div class="fav-title">${fav.title} <small style="color: #64748b">(${fav.code})</small></div>
+              <div class="fav-views">${fav.view_count} visualizações</div>
+            </div>
+          `)
+          .join("");
+      });
+  }
+
+  document.getElementById("btn-reset-session").addEventListener("click", () => {
+    if (!confirm("Deseja realmente zerar a sessão e as estrelas na TV agora?")) return;
+    fetch("/api/admin/reset-session", { method: "POST" })
+      .then((r) => r.json())
+      .then(() => {
+        alert("Sessão da TV reiniciada com sucesso!");
+      });
+  });
+
+  // Helpers
+  function formatDate(d) {
+    if (!d) return "";
+    const p = d.split("-");
+    return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : d;
+  }
+
+  function escapeHtml(str) {
+    return (str || "")
+      .replace(/&/g, "&amp;")
+      .replace(/'/g, "\\'")
+      .replace(/"/g, "&quot;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+  }
+
+  // Boot
+  document.addEventListener("DOMContentLoaded", () => {
+    loadAdminInfo();
+    loadItems();
+    loadSettings();
+  });
+})();
