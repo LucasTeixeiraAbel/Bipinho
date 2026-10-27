@@ -4,9 +4,7 @@ import subprocess
 import sqlite3
 from pathlib import Path
 from typing import Dict, Any
-from app.config import BASE_DIR, DB_PATH, DEFAULT_PORT, get_lan_ip
-
-VERSION = "1.1.0"
+from app.config import BASE_DIR, DB_PATH, DEFAULT_PORT, get_lan_ip, VERSION
 
 def get_ffmpeg_info() -> Dict[str, Any]:
     """Finds ffmpeg path and returns version details."""

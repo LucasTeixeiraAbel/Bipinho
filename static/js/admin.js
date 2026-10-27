@@ -34,6 +34,7 @@
       if (target === "tab-live") loadLiveStatus();
       if (target === "tab-history") loadHistory();
       if (target === "tab-parental") { loadParentalSettings(); loadChallenges(); }
+      if (target === "tab-about") loadAboutInfo();
       if (target === "tab-tester") {
         setTimeout(() => document.getElementById("tester-input").focus(), 100);
       }
@@ -1281,6 +1282,29 @@
       })
       .join("");
   }
+
+  // ----------------- ETAPA 5: ABOUT & CHANGELOG ----------------- //
+
+  function loadAboutInfo() {
+    const container = document.getElementById("changelog-container");
+    if (!container) return;
+    container.textContent = "Carregando histórico de alterações...";
+    fetch("/api/admin/about")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.changelog) {
+          container.textContent = data.changelog;
+        } else {
+          container.textContent = "Histórico de versões não encontrado.";
+        }
+      })
+      .catch((err) => {
+        container.textContent = "Erro ao carregar o CHANGELOG: " + err;
+      });
+  }
+
+  const btnLoadChangelog = document.getElementById("btn-load-changelog");
+  if (btnLoadChangelog) btnLoadChangelog.addEventListener("click", loadAboutInfo);
 
   // Boot
   document.addEventListener("DOMContentLoaded", () => {

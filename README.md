@@ -47,7 +47,19 @@ bipinho/
 │   └── sounds/                   # Efeitos sonoros WAV offline
 ├── tests/
 │   ├── test_bipinho.py           # Suíte de testes de fluxo e regressão (15 testes)
-│   └── test_etapa1.py            # Testes de segurança, hashing, rate limit e diagnóstico (6 testes)
+│   ├── test_etapa1.py            # Testes de segurança, hashing, rate limit e diagnóstico (6 testes)
+│   ├── test_etapa2.py            # Testes de confiabilidade na TV, Wake Lock e backup (9 testes)
+│   ├── test_etapa3.py            # Testes de controle dos pais, agenda e histórico (10 testes)
+│   ├── test_etapa4.py            # Testes de experiência da criança, categorias e colorir (7 testes)
+│   └── test_etapa5.py            # Testes de manutenção, distribuição e checklist (7 testes)
+├── atualizar.bat                 # Script de atualização automática (git pull + dependências)
+├── empacotar.bat                 # Script para empacotar em executável único com PyInstaller
+├── empacotar.py                  # Script Python auxiliar de compilação PyInstaller
+├── bipinho.spec                  # Especificação PyInstaller com persistência de banco e mídias
+├── resetar_senha.bat             # Utilitário para redefinir senha do admin caso esquecida
+├── resetar_senha.py              # Script Python de redefinição de senha com hash seguro
+├── CHECKLIST_TV.md               # Roteiro completo de testes manuais na TV real
+├── CHANGELOG.md                  # Registro detalhado de alterações por versão
 ├── iniciar_bipinho.bat           # Inicializador rápido (janela aberta)
 ├── iniciar_em_segundo_plano.vbs  # Inicializador silencioso (sem janela)
 ├── instalar_inicializacao_windows.bat # Configura início automático com o Windows
@@ -282,15 +294,52 @@ O Bipinho foi desenhado com foco no encantamento e na saúde visual da criança:
 
 ---
 
-## 🧪 11. Testes Automatizados
+## 📦 11. Manutenção, Atualização & Distribuição (Etapa 5)
 
-Execute os testes no terminal dentro da pasta do projeto:
+O Bipinho inclui utilitários completos para manutenção, atualização e empacotamento sem complicações:
+
+### 1. Atualização com Um Clique (`atualizar.bat`)
+Execute com dois cliques o arquivo `atualizar.bat`:
+- Encerra de forma segura qualquer processo rodando na porta 8000.
+- Executa `git pull` para baixar as últimas correções e novidades do GitHub.
+- Reinstala/atualiza automaticamente os pacotes do `requirements.txt`.
+- **Preserva 100% intactos** seu banco de dados (`data/bipinho.db`) e todos os vídeos cadastrados (`media/`).
+- Reinicia o servidor e exibe a mensagem de sucesso.
+
+### 2. Empacotamento para Executável Windows sem Python (`empacotar.bat`)
+Para rodar o Bipinho em computadores sem Python instalado:
+```cmd
+empacotar.bat
+```
+- Utiliza a especificação `bipinho.spec` com **PyInstaller**.
+- Inclui todos os templates HTML e estáticos (CSS, JS, sons offline).
+- **Exclui intencionalmente** as pastas `data/` e `media/` do arquivo binário, garantindo que o banco de dados e as mídias permaneçam gravadas no disco do usuário de forma persistente.
+- Gera o executável em `dist/Bipinho/Bipinho.exe`.
+
+### 3. Recuperação de Senha do Administrador (`resetar_senha.bat`)
+Se você esquecer a senha do painel administrativo, basta executar no terminal ou com dois cliques:
+```cmd
+resetar_senha.bat
+```
+O script redefine a senha para um valor padrão seguro, grava o hash PBKDF2 com salt e solicita uma nova troca de senha obrigatória no próximo login.
+
+### 4. Página "ℹ️ Sobre / Versão" e CHANGELOG
+Na rota `/admin` acesse a aba **"ℹ️ Sobre"** para visualizar:
+- Versão instalada do Bipinho (`v1.5.0`).
+- Status e resumo de cada uma das 5 etapas de evolução implementadas.
+- Registro completo de versões e notas de lançamento consultando o arquivo `CHANGELOG.md`.
+
+---
+
+## 🧪 12. Testes Automatizados
+
+O projeto conta com uma cobertura completa de testes unitários e de integração de ponta a ponta. Execute os testes no terminal dentro da pasta do projeto:
 
 ```bash
-# Testes de Segurança & Diagnóstico (Etapa 1 - 6 testes)
+# Testes de Segurança, Hashing, Rate Limit e Diagnóstico (Etapa 1 - 6 testes)
 python -m tests.test_etapa1
 
-# Testes de Confiabilidade na TV & Backup (Etapa 2 - 9 testes)
+# Testes de Confiabilidade na TV, Wake Lock e Backup (Etapa 2 - 9 testes)
 python -m tests.test_etapa2
 
 # Testes de Controle dos Pais, Agenda e Histórico (Etapa 3 - 10 testes)
@@ -299,8 +348,28 @@ python -m tests.test_etapa3
 # Testes de Experiência da Criança, Categorias e Colorir (Etapa 4 - 7 testes)
 python -m tests.test_etapa4
 
-# Teste de Fluxo Completo Original (15 testes)
+# Testes de Manutenção, Distribuição e Scripts (Etapa 5 - 7 testes)
+python -m tests.test_etapa5
+
+# Suíte de Fluxo Completo Original (15 testes)
 python -m tests.test_bipinho
 ```
 
-Todas as 5 suítes (totalizando **47 testes**) passam com 100% de sucesso!
+Todas as 6 suítes (totalizando **54 testes**) passam com 100% de sucesso!
+
+---
+
+## 📋 13. Homologação na TV Real
+
+Consulte o arquivo [`CHECKLIST_TV.md`](./CHECKLIST_TV.md) para o roteiro passo a passo de homologação manual em ambiente real com a TV e o leitor de código de barras físico. O checklist abrange:
+1. Conexão via Wi-Fi/cabo na rede local e interface 10-foot UI.
+2. Screen Wake Lock e prevenção de suspensão de tela.
+3. Reconexão automática em caso de queda de rede com aviso *"Bipinho já volta!"*.
+4. Interrupção imediata vs ignorar bipe durante a reprodução de vídeo.
+5. Modo de contagem por tempo assistido de tela.
+6. Limite diário e tela *"O Bipinho está dormindo"*.
+7. Liberação excepcional com a Chave dos Pais (`PAIS-LIBERAR-99`).
+8. Leitura dos cartões impressos com separação da folha dos pais.
+9. Impressão de páginas de contorno P&B para colorir.
+10. Mascote animado SVG com acenos e pulinhos ao bipar.
+11. Exportação e restauração de backup `.zip`.

@@ -1,12 +1,26 @@
 import os
+import sys
 import socket
 from pathlib import Path
 
+VERSION = "1.5.0"
+
 # Paths
-BASE_DIR = Path(__file__).resolve().parent.parent
-APP_DIR = BASE_DIR / "app"
-STATIC_DIR = BASE_DIR / "static"
-TEMPLATES_DIR = APP_DIR / "templates"
+if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+    # Running as PyInstaller executable bundle
+    BUNDLE_DIR = Path(sys._MEIPASS)
+    BASE_DIR = Path(sys.executable).resolve().parent
+    APP_DIR = BUNDLE_DIR / "app"
+    STATIC_DIR = BUNDLE_DIR / "static"
+    TEMPLATES_DIR = APP_DIR / "templates"
+else:
+    # Running from source
+    BASE_DIR = Path(__file__).resolve().parent.parent
+    APP_DIR = BASE_DIR / "app"
+    STATIC_DIR = BASE_DIR / "static"
+    TEMPLATES_DIR = APP_DIR / "templates"
+
+# Runtime directories (always persistent on host disk next to the executable / project)
 MEDIA_DIR = BASE_DIR / "media"
 UPLOADS_DIR = MEDIA_DIR / "uploads"
 THUMBS_DIR = MEDIA_DIR / "thumbs"
@@ -15,7 +29,7 @@ DATA_DIR = BASE_DIR / "data"
 DB_PATH = DATA_DIR / "bipinho.db"
 
 # Ensure runtime directories exist
-for folder in [MEDIA_DIR, UPLOADS_DIR, THUMBS_DIR, OUTLINES_DIR, DATA_DIR, STATIC_DIR]:
+for folder in [MEDIA_DIR, UPLOADS_DIR, THUMBS_DIR, OUTLINES_DIR, DATA_DIR]:
     folder.mkdir(parents=True, exist_ok=True)
 
 # Server Defaults

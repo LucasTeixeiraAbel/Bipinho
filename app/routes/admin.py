@@ -13,7 +13,8 @@ from pydantic import BaseModel
 
 from app.config import (
     TEMPLATES_DIR, DEFAULT_PORT, get_lan_ip,
-    READER_TIPS, UPLOADS_DIR, THUMBS_DIR, OUTLINES_DIR
+    READER_TIPS, UPLOADS_DIR, THUMBS_DIR, OUTLINES_DIR,
+    BASE_DIR, VERSION
 )
 from app.database import (
     get_all_items, get_item_by_id, get_item_by_code,
@@ -226,7 +227,29 @@ async def api_admin_info(request: Request):
         "admin_access_restriction": settings.get("admin_access_restriction", "all")
     }
 
-@router.get("/api/admin/categories")
+@router.get("/api/admin/about")
+async def api_admin_about(request: Request):
+    """Returns version details, stage statuses and CHANGELOG content."""
+    require_auth(request)
+    changelog_file = BASE_DIR / "CHANGELOG.md"
+    changelog_text = ""
+    if changelog_file.exists():
+        changelog_text = changelog_file.read_text(encoding="utf-8")
+
+    return {
+        "version": VERSION,
+        "app_name": "Bipinho",
+        "author": "Lucas Teixeira Abel",
+        "description": "Servidor de desenhos infantis acionados por código de barras em TV",
+        "etapas": [
+            {"num": 1, "name": "Segurança e higiene do repositório", "status": "concluido", "badge": "100%"},
+            {"num": 2, "name": "Confiabilidade na TV & Backup", "status": "concluido", "badge": "100%"},
+            {"num": 3, "name": "Controle dos pais & Painel ao vivo", "status": "concluido", "badge": "100%"},
+            {"num": 4, "name": "Experiência da criança & Atividades", "status": "concluido", "badge": "100%"},
+            {"num": 5, "name": "Manutenção, empacotamento e distribuição", "status": "concluido", "badge": "100%"},
+        ],
+        "changelog": changelog_text
+    }
 async def api_get_categories(request: Request):
     require_auth(request)
     return get_all_categories()
