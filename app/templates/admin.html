@@ -54,10 +54,14 @@
     <nav class="admin-tabs">
       <button class="tab-btn active" data-tab="tab-media">🎨 Desenhos e Mídias</button>
       <button class="tab-btn" data-tab="tab-settings">⚙️ Configurações Gerais</button>
+      <button class="tab-btn" data-tab="tab-parental">👨‍👩‍👧 Controle dos Pais</button>
+      <button class="tab-btn" data-tab="tab-live">📺 Painel ao Vivo</button>
+      <button class="tab-btn" data-tab="tab-history">📈 Histórico</button>
       <button class="tab-btn" data-tab="tab-reader">🏷️ Leitor de Código</button>
       <button class="tab-btn" data-tab="tab-tester">⚡ Testar Leitor</button>
       <button class="tab-btn" data-tab="tab-stats">📊 Estatísticas & Favoritos</button>
       <button class="tab-btn" data-tab="tab-diagnostics">🩺 Diagnóstico</button>
+      <button class="tab-btn" data-tab="tab-backup">📦 Backup & Restauração</button>
     </nav>
 
     <!-- Main Content Area -->
@@ -172,7 +176,22 @@
                       <span>Repetir o mesmo desenho toca o vídeo, mas só avança a estrela ao bipar um desenho novo.</span>
                     </div>
                   </label>
+                  <label class="radio-card">
+                    <input type="radio" name="count_mode" value="tempo_assistido">
+                    <div class="radio-text">
+                      <strong>Por tempo assistido</strong>
+                      <span>A pausa começa após atingir o limite de minutos de desenho.</span>
+                    </div>
+                  </label>
                 </div>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group flex-1" id="box-watch-time-limit">
+                <label for="cfg-watch-time-limit">Limite de Tempo Assistido (minutos)</label>
+                <input type="number" id="cfg-watch-time-limit" min="1" max="180" value="15">
+                <small class="field-hint">Tempo total de reprodução antes da pausa "Hora de colorir" (padrão: 15 min).</small>
               </div>
             </div>
 
@@ -224,6 +243,13 @@
                 <select id="cfg-sound">
                   <option value="1">Ligado (Sons alegres ao bipar e liberar)</option>
                   <option value="0">Desligado (Modo silencioso)</option>
+                </select>
+              </div>
+              <div class="form-group flex-1">
+                <label for="cfg-video-scan-behavior">Ao bipar durante um vídeo</label>
+                <select id="cfg-video-scan-behavior">
+                  <option value="interrupt">Interromper e trocar imediatamente para o novo desenho (Padrão)</option>
+                  <option value="ignore">Ignorar o bipe até o vídeo atual terminar</option>
                 </select>
               </div>
             </div>
@@ -312,6 +338,35 @@
               <span id="password-status" class="status-msg"></span>
             </div>
           </form>
+        </div>
+
+        <!-- Backup & Restore -->
+        <div class="card mt-24">
+          <h3>📦 Backup & Restauração</h3>
+          <p class="subtitle">Salve e restaure todos os seus desenhos cadastrados, configurações e arquivos de mídia.</p>
+
+          <div class="form-row" style="margin-top: 20px; align-items: flex-start;">
+            <div class="form-group flex-1">
+              <label>Exportar Backup Completo</label>
+              <p style="color:#64748b; font-size:13px; margin-bottom:10px;">Baixa um arquivo <code>.zip</code> com o banco de dados, todas as mídias e miniaturas.</p>
+              <a href="/api/admin/backup/export" class="btn btn-primary" id="btn-export-backup">
+                📥 Baixar Backup (.zip)
+              </a>
+            </div>
+            <div class="form-group flex-1">
+              <label>Restaurar Backup</label>
+              <p style="color:#64748b; font-size:13px; margin-bottom:10px;">Envie um arquivo <code>.zip</code> exportado pelo Bipinho para restaurar. <strong>Os dados atuais serão substituídos.</strong></p>
+              <form id="form-restore-backup" enctype="multipart/form-data">
+                <div class="input-with-button">
+                  <input type="file" id="restore-zip-input" name="file" accept=".zip" required>
+                </div>
+                <div class="form-actions" style="margin-top: 10px;">
+                  <button type="submit" class="btn btn-secondary">📤 Restaurar Backup</button>
+                  <span id="restore-status" class="status-msg"></span>
+                </div>
+              </form>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -524,6 +579,243 @@
             <div><strong>💾 Caminho do Banco:</strong> <span id="diag-db-path">bipinho.db</span> (<span id="diag-db-size">-- KB</span>)</div>
             <div><strong>⚡ Suspensão do Windows:</strong> <span id="diag-sleep-status">Verificando...</span></div>
             <div><strong>🌐 Endereço da TV:</strong> <code id="diag-tv-url">--</code></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= TAB: BACKUP & RESTORE ================= -->
+      <section id="tab-backup" class="tab-pane">
+        <div class="pane-header">
+          <div>
+            <h2>📦 Backup & Restauração</h2>
+            <p>Exporte uma cópia completa de todos os desenhos, miniaturas e configurações para outro computador ou restaure um backup anterior.</p>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>📥 Exportar Cópia de Segurança</h3>
+          <p class="subtitle">Baixe um arquivo compactado (.zip) contendo todo o banco de dados e os arquivos de mídia cadastrados.</p>
+          <div style="margin-top: 15px;">
+            <button id="btn-export-backup" class="btn btn-primary" type="button">
+              📥 Exportar Backup (.zip)
+            </button>
+          </div>
+        </div>
+
+        <div class="card mt-24">
+          <h3>📤 Restaurar Cópia de Segurança</h3>
+          <p class="subtitle">Envie um arquivo .zip de backup gerado previamente pelo Bipinho. Os desenhos e configurações serão restaurados.</p>
+          <form id="form-restore-backup" style="margin-top: 15px;">
+            <div class="form-group">
+              <label for="backup-file">Selecione o arquivo de backup (.zip):</label>
+              <input type="file" id="backup-file" accept=".zip" required>
+            </div>
+            <div class="form-actions" style="margin-top: 15px;">
+              <button type="submit" id="btn-restore-backup" class="btn btn-danger">
+                📤 Restaurar Backup
+              </button>
+              <span id="restore-status" class="status-msg"></span>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <!-- ================= TAB: PARENTAL CONTROLS ================= -->
+      <section id="tab-parental" class="tab-pane">
+        <div class="pane-header">
+          <div>
+            <h2>&#128106; Controle dos Pais</h2>
+            <p>Configure limites de hor&#225;rio, dias da semana, n&#250;mero de sess&#245;es por dia e a lista de atividades de movimento.</p>
+          </div>
+        </div>
+
+        <form id="form-parental-settings" class="card">
+          <div class="settings-group">
+            <h3>Agenda de Uso</h3>
+            <div class="form-row">
+              <div class="form-group flex-1">
+                <label for="cfg-schedule-enabled">Ativar controle de hor&#225;rio</label>
+                <select id="cfg-schedule-enabled">
+                  <option value="0">Desativado (TV sempre liberada)</option>
+                  <option value="1">Ativado (respeitar hor&#225;rio e dias abaixo)</option>
+                </select>
+              </div>
+              <div class="form-group flex-1">
+                <label for="cfg-max-sessions">M&#225;ximo de sess&#245;es por dia</label>
+                <input type="number" id="cfg-max-sessions" min="0" max="20" value="0">
+                <small class="field-hint">0 = ilimitado. Conta apenas as sess&#245;es que levaram &#224; pausa "Hora de colorir".</small>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group flex-1">
+                <label for="cfg-start-time">Hor&#225;rio de in&#237;cio</label>
+                <input type="time" id="cfg-start-time" value="07:00">
+              </div>
+              <div class="form-group flex-1">
+                <label for="cfg-end-time">Hor&#225;rio de encerramento</label>
+                <input type="time" id="cfg-end-time" value="21:00">
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Dias permitidos</label>
+              <div class="weekday-grid">
+                <label class="weekday-chip"><input type="checkbox" class="day-checkbox" value="0" checked> Seg</label>
+                <label class="weekday-chip"><input type="checkbox" class="day-checkbox" value="1" checked> Ter</label>
+                <label class="weekday-chip"><input type="checkbox" class="day-checkbox" value="2" checked> Qua</label>
+                <label class="weekday-chip"><input type="checkbox" class="day-checkbox" value="3" checked> Qui</label>
+                <label class="weekday-chip"><input type="checkbox" class="day-checkbox" value="4" checked> Sex</label>
+                <label class="weekday-chip"><input type="checkbox" class="day-checkbox" value="5" checked> S&#225;b</label>
+                <label class="weekday-chip"><input type="checkbox" class="day-checkbox" value="6" checked> Dom</label>
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-group">
+            <h3>Mascote &amp; Desafios</h3>
+            <div class="form-row">
+              <div class="form-group flex-1">
+                <label for="cfg-mascot-enabled">Mostrar mascote Bipinho na tela de espera</label>
+                <select id="cfg-mascot-enabled">
+                  <option value="1">Ativado</option>
+                  <option value="0">Desativado</option>
+                </select>
+              </div>
+              <div class="form-group flex-1">
+                <label for="cfg-challenges-enabled">Mostrar desafio de movimento na pausa</label>
+                <select id="cfg-challenges-enabled">
+                  <option value="1">Ativado</option>
+                  <option value="0">Desativado</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" class="btn btn-success">Salvar Configura&#231;&#245;es dos Pais</button>
+            <span id="parental-settings-status" class="status-msg"></span>
+          </div>
+        </form>
+
+        <!-- Movement Challenges Editor -->
+        <div class="card mt-24">
+          <h3>&#129336; Lista de Desafios de Movimento</h3>
+          <p class="subtitle">Estas sugest&#245;es aparecem na tela de pausa "Hora de colorir!". Uma &#233; sorteada aleatoriamente a cada pausa.</p>
+          <div id="challenges-list" style="margin-top:15px;">
+            <!-- Populated by JS -->
+          </div>
+          <div class="form-actions" style="margin-top:12px;">
+            <button id="btn-add-challenge" class="btn btn-outline" type="button">+ Adicionar Desafio</button>
+            <button id="btn-save-challenges" class="btn btn-success" type="button">Salvar Lista</button>
+            <span id="challenges-status" class="status-msg"></span>
+          </div>
+        </div>
+
+        <!-- Bulk Import -->
+        <div class="card mt-24">
+          <h3>&#128194; Importa&#231;&#227;o em Lote</h3>
+          <p class="subtitle">Informe o caminho de uma pasta no <strong>servidor</strong> com v&#237;deos e imagens. O Bipinho cadastra tudo automaticamente (t&#237;tulo pelo nome do arquivo, edit&#225;vel depois).</p>
+          <div class="form-row" style="margin-top:15px;">
+            <div class="form-group flex-2">
+              <label for="bulk-folder-path">Caminho completo da pasta no servidor</label>
+              <input type="text" id="bulk-folder-path" placeholder="Ex: C:\Users\Lucas\Videos\Desenhos">
+            </div>
+            <div class="form-group flex-1">
+              <label for="bulk-author">Autor padr&#227;o</label>
+              <input type="text" id="bulk-author" value="Fam&#237;lia">
+            </div>
+          </div>
+          <div class="form-actions">
+            <button id="btn-bulk-import" class="btn btn-primary" type="button">&#128194; Importar Pasta</button>
+            <span id="bulk-import-status" class="status-msg"></span>
+          </div>
+          <div id="bulk-import-results" style="display:none; margin-top:15px;"></div>
+        </div>
+      </section>
+
+      <!-- ================= TAB: LIVE PANEL ================= -->
+      <section id="tab-live" class="tab-pane">
+        <div class="pane-header">
+          <div>
+            <h2>&#128250; Painel ao Vivo</h2>
+            <p>Acompanhe o que est&#225; passando na TV agora e controle a sess&#227;o diretamente por aqui.</p>
+          </div>
+          <button id="btn-live-refresh" class="btn btn-outline">&#128260; Atualizar</button>
+        </div>
+
+        <!-- Live status cards -->
+        <div class="live-grid">
+          <div class="live-card">
+            <div class="live-card-label">Desenho Atual</div>
+            <div id="live-current-item" class="live-card-value live-big">&#8212;</div>
+          </div>
+          <div class="live-card">
+            <div class="live-card-label">&#11088; Estrelas</div>
+            <div id="live-stars" class="live-card-value live-big">0 / 3</div>
+          </div>
+          <div class="live-card">
+            <div class="live-card-label">&#9201; Tempo Assistido</div>
+            <div id="live-watch-time" class="live-card-value">0 min</div>
+          </div>
+          <div class="live-card">
+            <div class="live-card-label">&#9208; Pausa</div>
+            <div id="live-pause-info" class="live-card-value">&#8212;</div>
+          </div>
+          <div class="live-card">
+            <div class="live-card-label">&#128197; Agenda</div>
+            <div id="live-schedule-info" class="live-card-value">&#8212;</div>
+          </div>
+        </div>
+
+        <!-- Live control buttons -->
+        <div class="card mt-24">
+          <h3>Controles da TV</h3>
+          <div class="live-controls">
+            <button id="btn-live-end-pause" class="btn btn-success">&#9654;&#65039; Encerrar Pausa Agora</button>
+            <button id="btn-live-block-tv" class="btn btn-danger">&#128274; Bloquear TV</button>
+            <button id="btn-live-release-tv" class="btn btn-primary">&#128275; Liberar TV</button>
+            <button id="btn-live-reset-session" class="btn btn-outline">&#128260; Reiniciar Sess&#227;o</button>
+          </div>
+          <div id="live-control-status" class="status-msg" style="margin-top:10px;"></div>
+        </div>
+      </section>
+
+      <!-- ================= TAB: HISTORY ================= -->
+      <section id="tab-history" class="tab-pane">
+        <div class="pane-header">
+          <div>
+            <h2>&#128200; Hist&#243;rico Semanal</h2>
+            <p>Tempo total de tela, n&#250;mero de sess&#245;es e desenhos mais vistos nos &#250;ltimos 7 dias.</p>
+          </div>
+          <button id="btn-history-refresh" class="btn btn-outline">&#128260; Atualizar</button>
+        </div>
+
+        <!-- Weekly SVG chart -->
+        <div class="card">
+          <h3>Tempo de Tela por Dia (minutos)</h3>
+          <div id="history-chart-container" style="width:100%; overflow-x:auto;">
+            <svg id="history-chart" width="700" height="200" viewBox="0 0 700 200" style="display:block; margin:0 auto; font-family:sans-serif;">
+              <!-- Populated by JS -->
+            </svg>
+          </div>
+        </div>
+
+        <!-- Weekly table -->
+        <div class="card mt-24">
+          <h3>Detalhes por Dia</h3>
+          <div id="history-table-container" style="overflow-x:auto;">
+            <table id="history-table" class="data-table">
+              <thead>
+                <tr>
+                  <th>Data</th>
+                  <th>Sess&#245;es</th>
+                  <th>Tempo Total</th>
+                  <th>Desenhos Mais Vistos</th>
+                </tr>
+              </thead>
+              <tbody id="history-table-body">
+                <!-- Populated by JS -->
+              </tbody>
+            </table>
           </div>
         </div>
       </section>

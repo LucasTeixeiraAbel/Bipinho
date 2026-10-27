@@ -321,37 +321,23 @@
         const container = document.getElementById('sheet-container');
         const includeSpecial = document.getElementById('chk-special').checked;
 
-        // Build list of cards to render
-        let cards = [...allItems];
+        // Build list of normal cards for the child's folder (including Surprise drawing)
+        let normalCards = [...allItems];
 
-        if (includeSpecial) {
-          const parentCode = settings.parent_unlock_code || 'PAIS-LIBERAR-99';
+        if (includeSpecial && settings.surprise_enabled !== '0') {
           const surpriseCode = settings.surprise_code || 'BIP-SURPRESA';
-
-          cards.push({
+          normalCards.push({
             isSpecial: true,
-            type: 'parent',
-            code: parentCode,
-            title: 'Chave dos Pais (Liberar Pausa)',
-            author: 'Uso exclusivo dos pais',
-            badge: 'Bipinho • Chave Secreta 🔑',
-            icon: '🔑'
+            type: 'surprise',
+            code: surpriseCode,
+            title: 'Desenho Surpresa!',
+            author: 'Sorteia um desenho aleatório',
+            badge: 'Bipinho • Surpresa 🎲',
+            icon: '🎲'
           });
-
-          if (settings.surprise_enabled !== '0') {
-            cards.push({
-              isSpecial: true,
-              type: 'surprise',
-              code: surpriseCode,
-              title: 'Desenho Surpresa!',
-              author: 'Sorteia um desenho aleatório',
-              badge: 'Bipinho • Surpresa 🎲',
-              icon: '🎲'
-            });
-          }
         }
 
-        if (cards.length === 0) {
+        if (normalCards.length === 0 && !includeSpecial) {
           container.innerHTML = `
             <div class="a4-page">
               <div class="page-header">
@@ -369,20 +355,21 @@
           return;
         }
 
-        // 6 cards per A4 page (2 columns x 3 rows)
+        // 6 cards per A4 page (2 columns x 3 rows) for the child's folder
         const CARDS_PER_PAGE = 6;
-        const totalPages = Math.ceil(cards.length / CARDS_PER_PAGE);
+        const totalChildPages = Math.ceil(normalCards.length / CARDS_PER_PAGE) || 1;
 
         let html = '';
-        for (let p = 0; p < totalPages; p++) {
-          const pageCards = cards.slice(p * CARDS_PER_PAGE, (p + 1) * CARDS_PER_PAGE);
+        for (let p = 0; p < totalChildPages; p++) {
+          const pageCards = normalCards.slice(p * CARDS_PER_PAGE, (p + 1) * CARDS_PER_PAGE);
+          if (pageCards.length === 0) continue;
 
           html += `
             <div class="a4-page">
               <div class="page-header">
                 <div class="header-logo">
                   <h1>Bipinho</h1>
-                  <span class="header-desc">Cartões para Pastinha da Criança • Página ${p + 1} de ${totalPages}</span>
+                  <span class="header-desc">Cartões para Pastinha da Criança • Página ${p + 1} de ${totalChildPages}</span>
                 </div>
                 <div style="font-size: 11px; color: #94a3b8;">
                   Recorte nas linhas tracejadas ✂
@@ -391,6 +378,46 @@
 
               <div class="cards-grid">
                 ${pageCards.map(c => renderCardHtml(c)).join('')}
+              </div>
+            </div>
+          `;
+        }
+
+        // DEDICATED PAGE FOR PARENT KEY (Separated onto its own page)
+        if (includeSpecial) {
+          const parentCode = settings.parent_unlock_code || 'PAIS-LIBERAR-99';
+          const parentCard = {
+            isSpecial: true,
+            type: 'parent',
+            code: parentCode,
+            title: 'Chave dos Pais (Liberar Pausa & TV)',
+            author: 'Uso exclusivo dos pais / responsáveis',
+            badge: 'Bipinho • Chave Secreta 🔑',
+            icon: '🔑'
+          };
+
+          html += `
+            <div class="a4-page" style="border: 3px solid #ef4444;">
+              <div class="page-header" style="border-bottom: 2px solid #ef4444;">
+                <div class="header-logo">
+                  <h1 style="color: #b91c1c;">🔑 Bipinho — Chave dos Pais</h1>
+                  <span class="header-desc" style="color: #dc2626; font-weight: 800;">
+                    ⚠️ NÃO COLOCAR NA PASTINHA DA CRIANÇA!
+                  </span>
+                </div>
+                <div style="font-size: 11px; color: #b91c1c; font-weight: bold;">
+                  Guarde em local reservado aos adultos
+                </div>
+              </div>
+
+              <div style="background: #fef2f2; border: 1.5px dashed #f87171; border-radius: 8px; padding: 12px 16px; margin-bottom: 20px; font-size: 13px; color: #991b1b; line-height: 1.5;">
+                <strong>Instruções para os pais:</strong><br>
+                Este cartão possui o código secreto capaz de desbloquear a TV imediatamente durante a pausa ("Hora de colorir") ou fora dos horários permitidos.
+                Mantenha-o guardado fora do alcance da criança.
+              </div>
+
+              <div class="cards-grid" style="grid-template-columns: 1fr; max-width: 320px; margin: 0 auto;">
+                ${renderCardHtml(parentCard)}
               </div>
             </div>
           `;

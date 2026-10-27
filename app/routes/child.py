@@ -5,6 +5,7 @@ from pydantic import BaseModel
 
 from app.config import TEMPLATES_DIR
 from app.database import get_all_settings
+from app.services.schedule_service import check_schedule_allowed
 from app.services.session_manager import (
     handle_barcode_scan,
     get_current_session_info,
@@ -17,6 +18,10 @@ router = APIRouter()
 
 class ScanRequest(BaseModel):
     code: str
+    is_video_playing: bool = False
+
+class WatchTimeRequest(BaseModel):
+    seconds: float
 
 @router.get("/", response_class=HTMLResponse)
 async def child_screen():
@@ -25,12 +30,61 @@ async def child_screen():
         raise HTTPException(status_code=500, detail="child.html não encontrado")
     return HTMLResponse(content=template_file.read_text(encoding="utf-8"))
 
+@router.get("/api/schedule/status")
+async def api_schedule_status():
+    """Returns current schedule/restriction status for the TV screen."""
+    return check_schedule_allowed()
+
 @router.post("/api/scan")
 async def api_scan_barcode(req: ScanRequest):
     if not req.code or not req.code.strip():
         raise HTTPException(status_code=400, detail="Código inválido")
-    result = await handle_barcode_scan(req.code)
+
+    # Parent key can unlock exceptionally even if schedule is blocked
+    settings = get_all_settings()
+    parent_code = settings.get("parent_unlock_code", "PAIS-LIBERAR-99").strip().upper()
+    is_parent_key = (req.code.strip().upper() == parent_code)
+
+    # Schedule check: block scan if outside allowed window
+    schedule = check_schedule_allowed()
+    if not schedule["allowed"] and not is_parent_key:
+        return {
+            "status": "schedule_blocked",
+            "reason": schedule["reason"],
+            "tv_blocked": schedule.get("tv_blocked", False),
+        }
+
+    result = await handle_barcode_scan(req.code, is_video_playing=req.is_video_playing)
     return result
+
+@router.post("/api/session/report-watch-time")
+async def api_report_watch_time(req: WatchTimeRequest):
+    from app.database import add_watched_seconds
+    total_watched = add_watched_seconds(req.seconds)
+    settings = get_all_settings()
+    count_mode = settings.get("count_mode", "leituras")
+    limit_minutes = int(settings.get("watch_time_limit_minutes", 15))
+    limit_sec = limit_minutes * 60
+
+    if count_mode == "tempo_assistido":
+        if total_watched >= limit_sec:
+            await trigger_coloring_pause()
+            return {
+                "watched_seconds": total_watched,
+                "limit_reached": True,
+                "is_paused": True
+            }
+        return {
+            "watched_seconds": total_watched,
+            "limit_reached": False,
+            "is_paused": False
+        }
+
+    return {
+        "watched_seconds": total_watched,
+        "limit_reached": False,
+        "is_paused": False
+    }
 
 @router.get("/api/session/status")
 async def api_session_status():

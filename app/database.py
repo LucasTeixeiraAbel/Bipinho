@@ -49,9 +49,15 @@ def init_db():
                 scanned_items_json TEXT DEFAULT '[]',
                 last_scanned_code TEXT,
                 last_scanned_at TEXT,
-                current_item_id INTEGER
+                current_item_id INTEGER,
+                watched_seconds REAL DEFAULT 0
             )
         """)
+
+        # Migration: Ensure watched_seconds exists in session_state
+        cur_cols = [r[1] for r in conn.execute("PRAGMA table_info(session_state)").fetchall()]
+        if "watched_seconds" not in cur_cols:
+            conn.execute("ALTER TABLE session_state ADD COLUMN watched_seconds REAL DEFAULT 0")
 
         # Initialize default settings if not exists
         for key, val in DEFAULT_SETTINGS.items():
@@ -89,12 +95,74 @@ def init_db():
                 )
                 conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('admin_password_changed', '0')")
 
+        # Daily sessions tracking
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS daily_sessions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                date TEXT NOT NULL,
+                session_num INTEGER NOT NULL DEFAULT 1,
+                started_at TEXT NOT NULL,
+                ended_at TEXT,
+                total_watched_seconds REAL DEFAULT 0,
+                scans_count INTEGER DEFAULT 0,
+                items_json TEXT DEFAULT '[]'
+            )
+        """)
+
+        # Viewing history / analytics
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS view_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                item_id INTEGER NOT NULL,
+                item_code TEXT NOT NULL,
+                item_title TEXT NOT NULL,
+                viewed_at TEXT NOT NULL,
+                watched_seconds REAL DEFAULT 0
+            )
+        """)
+
+        # Movement challenges list
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS movement_challenges (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                challenge TEXT NOT NULL,
+                enabled INTEGER DEFAULT 1,
+                sort_order INTEGER DEFAULT 0
+            )
+        """)
+
+        # Seed default movement challenges if table is empty
+        count = conn.execute("SELECT COUNT(*) FROM movement_challenges").fetchone()[0]
+        if count == 0:
+            default_challenges = [
+                "Dê 10 pulinhos!",
+                "Gire como um bailarino!",
+                "Imite um bichinho da sua escolha!",
+                "Faça 5 agachamentos!",
+                "Pule de um pé só por 10 segundos!",
+                "Faça uma estrela com o corpo!",
+                "Corra no lugar por 15 segundos!",
+                "Imite um robô andando!",
+                "Dê 5 cambalhotas imaginárias!",
+                "Balance os braços como um pássaro!",
+                "Pule feito um sapo 5 vezes!",
+                "Toque nos pés sem dobrar os joelhos!",
+                "Faça carinha de leão e ruja 3 vezes!",
+                "Equilibre-se numa perna só por 10 segundos!",
+                "Dance sua música favorita por 20 segundos!",
+            ]
+            for i, c in enumerate(default_challenges):
+                conn.execute(
+                    "INSERT INTO movement_challenges (challenge, enabled, sort_order) VALUES (?, 1, ?)",
+                    (c, i)
+                )
+
         # Initialize session state row 1
         conn.execute("""
             INSERT OR IGNORE INTO session_state (
                 id, current_scans, is_paused, pause_started_at,
-                scanned_items_json, last_scanned_code, last_scanned_at, current_item_id
-            ) VALUES (1, 0, 0, NULL, '[]', NULL, NULL, NULL)
+                scanned_items_json, last_scanned_code, last_scanned_at, current_item_id, watched_seconds
+            ) VALUES (1, 0, 0, NULL, '[]', NULL, NULL, NULL, 0)
         """)
     conn.close()
 
@@ -276,13 +344,15 @@ def get_session_state() -> Dict[str, Any]:
             "scanned_items": [],
             "last_scanned_code": None,
             "last_scanned_at": None,
-            "current_item_id": None
+            "current_item_id": None,
+            "watched_seconds": 0.0
         }
     data = dict(row)
     try:
         data["scanned_items"] = json.loads(data.get("scanned_items_json") or "[]")
     except Exception:
         data["scanned_items"] = []
+    data["watched_seconds"] = float(data.get("watched_seconds") or 0.0)
     return data
 
 def update_session_state(
@@ -292,7 +362,8 @@ def update_session_state(
     scanned_items: Optional[List[int]] = None,
     last_scanned_code: Optional[str] = "KEEP",
     last_scanned_at: Optional[str] = "KEEP",
-    current_item_id: Optional[int] = "KEEP" # type: ignore
+    current_item_id: Optional[int] = "KEEP", # type: ignore
+    watched_seconds: Optional[float] = None
 ):
     current = get_session_state()
     new_scans = current["current_scans"] if current_scans is None else current_scans
@@ -302,6 +373,7 @@ def update_session_state(
     new_code = current["last_scanned_code"] if last_scanned_code == "KEEP" else last_scanned_code
     new_time = current["last_scanned_at"] if last_scanned_at == "KEEP" else last_scanned_at
     new_item_id = current["current_item_id"] if current_item_id == "KEEP" else current_item_id
+    new_watched = current["watched_seconds"] if watched_seconds is None else float(watched_seconds)
 
     conn = get_connection()
     with conn:
@@ -313,7 +385,8 @@ def update_session_state(
                 scanned_items_json = ?,
                 last_scanned_code = ?,
                 last_scanned_at = ?,
-                current_item_id = ?
+                current_item_id = ?,
+                watched_seconds = ?
             WHERE id = 1
         """, (
             new_scans,
@@ -322,9 +395,23 @@ def update_session_state(
             json.dumps(new_items),
             new_code,
             new_time,
-            new_item_id
+            new_item_id,
+            new_watched
         ))
     conn.close()
+
+def add_watched_seconds(seconds: float) -> float:
+    """Adds elapsed seconds to the watched_seconds accumulator and returns new total."""
+    conn = get_connection()
+    with conn:
+        conn.execute("""
+            UPDATE session_state
+            SET watched_seconds = COALESCE(watched_seconds, 0) + ?
+            WHERE id = 1
+        """, (float(seconds),))
+    conn.close()
+    state = get_session_state()
+    return state.get("watched_seconds", 0.0)
 
 def reset_session():
     conn = get_connection()
@@ -337,7 +424,8 @@ def reset_session():
                 scanned_items_json = '[]',
                 last_scanned_code = NULL,
                 last_scanned_at = NULL,
-                current_item_id = NULL
+                current_item_id = NULL,
+                watched_seconds = 0
             WHERE id = 1
         """)
     conn.close()
@@ -364,3 +452,121 @@ def get_stats() -> Dict[str, Any]:
         "total_views": total_views,
         "favorites": favorites
     }
+
+# ----------------- DAILY SESSIONS ----------------- #
+
+def get_today_session_count(date_str: Optional[str] = None) -> int:
+    """Returns the number of completed sessions for a given date (default: today)."""
+    from datetime import date as dt_date
+    if not date_str:
+        date_str = dt_date.today().isoformat()
+    conn = get_connection()
+    count = conn.execute(
+        "SELECT COUNT(*) FROM daily_sessions WHERE date = ?", (date_str,)
+    ).fetchone()[0]
+    conn.close()
+    return count
+
+def start_daily_session(date_str: str, session_num: int, started_at: str) -> int:
+    """Creates a new daily session record. Returns its id."""
+    conn = get_connection()
+    with conn:
+        cur = conn.execute(
+            "INSERT INTO daily_sessions (date, session_num, started_at) VALUES (?, ?, ?)",
+            (date_str, session_num, started_at)
+        )
+        row_id = cur.lastrowid
+    conn.close()
+    return row_id
+
+def end_daily_session(session_id: int, ended_at: str, total_watched_seconds: float, scans_count: int, items_list: list):
+    """Updates a daily session record when it ends (pause triggered)."""
+    conn = get_connection()
+    with conn:
+        conn.execute("""
+            UPDATE daily_sessions
+            SET ended_at = ?, total_watched_seconds = ?, scans_count = ?, items_json = ?
+            WHERE id = ?
+        """, (ended_at, total_watched_seconds, scans_count, json.dumps(items_list), session_id))
+    conn.close()
+
+def get_history_by_date(date_str: str) -> Dict[str, Any]:
+    """Returns aggregated history for a given date."""
+    conn = get_connection()
+    sessions = conn.execute(
+        "SELECT * FROM daily_sessions WHERE date = ? ORDER BY started_at",
+        (date_str,)
+    ).fetchall()
+    sessions_list = [dict(s) for s in sessions]
+
+    # Most-viewed items that day
+    top_items = conn.execute("""
+        SELECT vh.item_code, vh.item_title, COUNT(*) as plays
+        FROM view_history vh
+        WHERE DATE(vh.viewed_at) = ?
+        GROUP BY vh.item_code
+        ORDER BY plays DESC
+        LIMIT 5
+    """, (date_str,)).fetchall()
+    conn.close()
+
+    total_watched = sum(float(s.get("total_watched_seconds") or 0) for s in sessions_list)
+    return {
+        "date": date_str,
+        "session_count": len(sessions_list),
+        "total_watched_seconds": total_watched,
+        "sessions": sessions_list,
+        "top_items": [dict(t) for t in top_items]
+    }
+
+def get_weekly_history(base_date: Optional[str] = None) -> List[Dict[str, Any]]:
+    """Returns last 7 days of history."""
+    from datetime import date as dt_date, timedelta
+    if not base_date:
+        base_date = dt_date.today().isoformat()
+    today = dt_date.fromisoformat(base_date)
+    result = []
+    for delta in range(6, -1, -1):
+        d = (today - timedelta(days=delta)).isoformat()
+        result.append(get_history_by_date(d))
+    return result
+
+def record_view_history(item_id: int, item_code: str, item_title: str, watched_seconds: float = 0):
+    """Records one viewing event in the history log."""
+    conn = get_connection()
+    with conn:
+        conn.execute(
+            "INSERT INTO view_history (item_id, item_code, item_title, viewed_at, watched_seconds) VALUES (?, ?, ?, ?, ?)",
+            (item_id, item_code, item_title, datetime.now().isoformat(), watched_seconds)
+        )
+    conn.close()
+
+# ----------------- MOVEMENT CHALLENGES ----------------- #
+
+def get_all_challenges() -> List[Dict[str, Any]]:
+    conn = get_connection()
+    rows = conn.execute(
+        "SELECT * FROM movement_challenges ORDER BY sort_order, id"
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+def get_random_challenge() -> Optional[str]:
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT challenge FROM movement_challenges WHERE enabled = 1 ORDER BY RANDOM() LIMIT 1"
+    ).fetchone()
+    conn.close()
+    return row["challenge"] if row else None
+
+def set_challenges(challenges_list: List[Dict[str, Any]]):
+    """Replace the entire challenges list."""
+    conn = get_connection()
+    with conn:
+        conn.execute("DELETE FROM movement_challenges")
+        for i, c in enumerate(challenges_list):
+            conn.execute(
+                "INSERT INTO movement_challenges (challenge, enabled, sort_order) VALUES (?, ?, ?)",
+                (c.get("challenge", ""), 1 if c.get("enabled", True) else 0, i)
+            )
+    conn.close()

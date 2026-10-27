@@ -1,13 +1,14 @@
 import os
 import secrets
+from datetime import datetime, date as dt_date
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 
 from fastapi import (
     APIRouter, Request, Response, Form, UploadFile, File,
     HTTPException, Depends, status
 )
-from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
 from app.config import (
@@ -18,13 +19,17 @@ from app.database import (
     get_all_items, get_item_by_id, get_item_by_code,
     create_item, update_item, delete_item, get_next_available_code,
     get_all_settings, get_setting, set_setting, set_settings,
-    get_stats, reset_session
+    get_stats, reset_session,
+    get_weekly_history, get_history_by_date,
+    get_all_challenges, set_challenges,
 )
 from app.services.auth_service import hash_password, verify_password
 from app.services.rate_limiter import check_ip_lockout, record_login_failure, record_login_success
 from app.services.diagnostic_service import get_full_diagnostics, get_ffmpeg_info
 from app.services.media_service import save_and_process_media, is_ffmpeg_installed
-from app.services.session_manager import handle_barcode_scan, broadcast_event
+from app.services.session_manager import handle_barcode_scan, broadcast_event, get_current_session_info
+from app.services.backup_service import create_backup_zip, validate_backup_zip, restore_backup_zip
+from app.services.schedule_service import check_schedule_allowed
 
 router = APIRouter()
 
@@ -420,3 +425,203 @@ async def api_reset_session(request: Request):
     reset_session()
     await broadcast_event("session_reset", {"status": "reset"})
     return {"status": "success", "message": "Sessão reiniciada com sucesso!"}
+
+# ----------------- BACKUP / RESTORE ----------------- #
+
+@router.get("/api/admin/backup/export")
+async def api_export_backup(request: Request):
+    require_auth(request)
+    zip_buffer = create_backup_zip()
+    filename = f"bipinho_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
+    return StreamingResponse(
+        zip_buffer,
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"'
+        }
+    )
+
+@router.post("/api/admin/backup/restore")
+async def api_restore_backup(request: Request, file: UploadFile = File(...)):
+    require_auth(request)
+    zip_bytes = await file.read()
+    if not zip_bytes:
+        raise HTTPException(status_code=400, detail="Arquivo de backup vazio ou não informado.")
+
+    ok, msg = restore_backup_zip(zip_bytes)
+    if not ok:
+        raise HTTPException(status_code=400, detail=msg)
+
+    return {"status": "success", "message": msg}
+
+# ----------------- ETAPA 3: PARENTAL CONTROLS ----------------- #
+
+@router.get("/api/admin/live-status")
+async def api_live_status(request: Request):
+    """Returns real-time status for the admin live panel."""
+    require_auth(request)
+    info = get_current_session_info()
+    schedule = check_schedule_allowed()
+    return {
+        **info,
+        "schedule": schedule,
+        "tv_blocked": schedule.get("tv_blocked", False),
+    }
+
+@router.post("/api/admin/tv/block")
+async def api_tv_block(request: Request):
+    """Admin blocks TV manually."""
+    require_auth(request)
+    set_setting("tv_blocked", "1")
+    await broadcast_event("tv_blocked", {"blocked": True, "reason": "TV bloqueada manualmente pelos pais."})
+    return {"status": "success", "tv_blocked": True}
+
+@router.post("/api/admin/tv/release")
+async def api_tv_release(request: Request):
+    """Admin releases TV from manual block."""
+    require_auth(request)
+    set_setting("tv_blocked", "0")
+    await broadcast_event("tv_blocked", {"blocked": False, "reason": ""})
+    return {"status": "success", "tv_blocked": False}
+
+@router.post("/api/admin/session/end-pause")
+async def api_end_pause(request: Request):
+    """Admin ends the current pause immediately."""
+    require_auth(request)
+    from app.services.session_manager import unlock_coloring_pause
+    result = await unlock_coloring_pause(by_parents=True)
+    return {"status": "success", **result}
+
+@router.get("/api/admin/history")
+async def api_history(request: Request, days: int = 7):
+    """Returns daily/weekly history for charts."""
+    require_auth(request)
+    history = get_weekly_history()
+    return {"history": history}
+
+@router.get("/api/admin/history/{date}")
+async def api_history_date(date: str, request: Request):
+    """Returns history for a specific date (YYYY-MM-DD)."""
+    require_auth(request)
+    try:
+        from datetime import date as dt
+        dt.fromisoformat(date)  # validate format
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Data inválida. Use YYYY-MM-DD.")
+    return get_history_by_date(date)
+
+@router.get("/api/admin/challenges")
+async def api_get_challenges(request: Request):
+    """Returns the movement challenges list."""
+    require_auth(request)
+    return {"challenges": get_all_challenges()}
+
+class ChallengesUpdateRequest(BaseModel):
+    challenges: List[Dict[str, Any]]
+
+@router.post("/api/admin/challenges")
+async def api_update_challenges(payload: ChallengesUpdateRequest, request: Request):
+    """Replaces the movement challenges list."""
+    require_auth(request)
+    set_challenges(payload.challenges)
+    return {"status": "success", "count": len(payload.challenges)}
+
+@router.get("/api/admin/schedule/status")
+async def api_schedule_status(request: Request):
+    """Returns the current schedule status (for admin awareness)."""
+    require_auth(request)
+    return check_schedule_allowed()
+
+# ----------------- ETAPA 3: BULK IMPORT ----------------- #
+
+class BulkImportRequest(BaseModel):
+    folder_path: str
+    author: str = "Família"
+
+@router.post("/api/admin/bulk-import")
+async def api_bulk_import(payload: BulkImportRequest, request: Request):
+    """
+    Scans a local server folder for video/image files and registers them.
+    Files must already be accessible on the server filesystem.
+    Returns list of imported items and any errors.
+    """
+    require_auth(request)
+
+    ALLOWED_EXTENSIONS = {
+        ".mp4", ".mkv", ".avi", ".mov", ".wmv", ".webm",
+        ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp"
+    }
+
+    folder = Path(payload.folder_path)
+    if not folder.exists() or not folder.is_dir():
+        raise HTTPException(
+            status_code=400,
+            detail=f"Pasta não encontrada ou não é um diretório: {payload.folder_path}"
+        )
+
+    imported = []
+    errors = []
+    today = dt_date.today().isoformat()
+
+    for file_path in sorted(folder.iterdir()):
+        if not file_path.is_file():
+            continue
+        ext = file_path.suffix.lower()
+        if ext not in ALLOWED_EXTENSIONS:
+            continue
+
+        # Generate title from filename
+        title = file_path.stem.replace("_", " ").replace("-", " ").strip()
+        if not title:
+            title = file_path.name
+
+        # Auto-generate code
+        auto_code = get_next_available_code()
+
+        # Check for conflict
+        if get_item_by_code(auto_code):
+            errors.append({"file": file_path.name, "error": f"Código {auto_code} já existe."})
+            continue
+
+        # Check ffmpeg availability for non-MP4 videos
+        if ext in {".mkv", ".avi", ".mov", ".wmv", ".webm"} and not is_ffmpeg_installed():
+            errors.append({
+                "file": file_path.name,
+                "error": "ffmpeg não instalado. Não é possível converter este vídeo."
+            })
+            continue
+
+        try:
+            file_bytes = file_path.read_bytes()
+            media_type, safe_name, thumb_name, warning = save_and_process_media(
+                file_bytes=file_bytes,
+                original_filename=file_path.name,
+                title=title
+            )
+            item_id = create_item(
+                code=auto_code,
+                title=title,
+                author=payload.author,
+                date=today,
+                media_type=media_type,
+                filename=safe_name,
+                thumb_filename=thumb_name,
+            )
+            imported.append({
+                "item_id": item_id,
+                "code": auto_code,
+                "title": title,
+                "file": file_path.name,
+                "media_type": media_type,
+                "warning": warning,
+            })
+        except Exception as e:
+            errors.append({"file": file_path.name, "error": str(e)})
+
+    return {
+        "status": "success",
+        "imported_count": len(imported),
+        "error_count": len(errors),
+        "imported": imported,
+        "errors": errors,
+    }

@@ -484,3 +484,154 @@ html, body {
   margin-top: 6px;
   font-weight: 700;
 }
+
+/* ----------------- 6. CONNECTION DISCONNECTED OVERLAY ----------------- */
+.connection-toast-layer {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.85);
+  z-index: 100;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  pointer-events: none;
+  text-align: center;
+}
+
+.connection-toast-layer.show,
+.connection-toast-layer.active {
+  opacity: 1;
+  visibility: visible;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+.connection-toast-card {
+  background: rgba(15, 23, 42, 0.94);
+  backdrop-filter: blur(20px);
+  padding: 4.5vh 6vw;
+  border-radius: 32px;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.75);
+  border: 3px solid rgba(59, 130, 246, 0.5);
+}
+
+.connection-icon-anim {
+  font-size: 6vw;
+  margin-bottom: 1.5vh;
+  animation: pulseConnection 2.2s infinite ease-in-out;
+}
+
+@keyframes pulseConnection {
+  0%, 100% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 12px rgba(59, 130, 246, 0.6));
+  }
+  50% {
+    transform: scale(1.12);
+    filter: drop-shadow(0 0 28px rgba(245, 158, 11, 0.85));
+  }
+}
+
+.connection-toast-card h3 {
+  font-size: 3.8vw;
+  font-weight: 900;
+  color: #60a5fa;
+}
+
+.connection-toast-card p {
+  font-size: 2.2vw;
+  color: #e2e8f0;
+  margin-top: 8px;
+  font-weight: 700;
+}
+
+/* ----------------- 7. SLEEPING SCREEN (O Bipinho está dormindo) ----------------- */
+#sleeping-screen {
+  background: radial-gradient(circle at center, #1e1b4b 0%, #09090b 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.sleeping-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4vh 6vw;
+}
+
+.sleeping-mascot {
+  animation: sleepingBreath 3.5s ease-in-out infinite;
+  margin-bottom: 2vh;
+}
+
+.sleeping-mascot-emoji {
+  font-size: 14vw;
+  display: inline-block;
+  filter: drop-shadow(0 15px 35px rgba(99, 102, 241, 0.45));
+}
+
+@keyframes sleepingBreath {
+  0%, 100% { transform: scale(1) translateY(0); }
+  50% { transform: scale(1.08) translateY(-10px); }
+}
+
+.sleeping-title {
+  font-size: 4.8vw;
+  font-weight: 900;
+  color: #a5b4fc;
+  letter-spacing: -0.5px;
+  text-shadow: 0 4px 15px rgba(0, 0, 0, 0.6);
+  margin-bottom: 1.5vh;
+}
+
+.sleeping-subtitle {
+  font-size: 2.4vw;
+  color: #c7d2fe;
+  max-width: 75vw;
+  line-height: 1.4;
+  margin-bottom: 3vh;
+}
+
+.sleeping-hint {
+  font-size: 1.6vw;
+  color: #818cf8;
+  background: rgba(30, 27, 75, 0.7);
+  padding: 1.2vh 3vw;
+  border-radius: 9999px;
+  border: 1.5px dashed rgba(165, 180, 252, 0.4);
+}
+
+/* ----------------- MOVEMENT CHALLENGE BOX (PAUSE) ----------------- */
+.pause-challenge-box {
+  margin-top: 2.5vh;
+  background: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(10px);
+  padding: 1.8vh 3.5vw;
+  border-radius: 20px;
+  border: 2px solid rgba(251, 191, 36, 0.5);
+  animation: popChallenge 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes popChallenge {
+  0% { transform: scale(0.85); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.challenge-badge {
+  font-size: 1.4vw;
+  font-weight: 800;
+  color: #fbbf24;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 0.5vh;
+}
+
+.challenge-text {
+  font-size: 2.6vw;
+  font-weight: 900;
+  color: #ffffff;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.5);
+}

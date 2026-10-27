@@ -25,6 +25,11 @@
   const pauseProgressBar = document.getElementById("pause-progress-bar");
   const pauseTimeLabel = document.getElementById("pause-time-label");
   const pauseScanWarning = document.getElementById("pause-scan-warning");
+  const connectionToast = document.getElementById("connection-toast");
+  const sleepingScreen = document.getElementById("sleeping-screen");
+  const sleepingReason = document.getElementById("sleeping-reason");
+  const pauseChallengeBox = document.getElementById("pause-challenge-box");
+  const pauseChallengeText = document.getElementById("pause-challenge-text");
 
   // State
   let readerProfile = {
@@ -57,6 +62,53 @@
   let lastCharTimestamp = 0;
   let bufferTimeout = null;
   let audioContext = null;
+
+  // ----------------- SCREEN WAKE LOCK (TV DISPLAY) ----------------- //
+  let wakeLock = null;
+
+  async function requestWakeLock() {
+    if ("wakeLock" in navigator && navigator.wakeLock.request) {
+      try {
+        wakeLock = await navigator.wakeLock.request("screen");
+        wakeLock.addEventListener("release", () => {
+          wakeLock = null;
+        });
+        console.log("Screen Wake Lock acquired.");
+      } catch (err) {
+        console.warn("Screen Wake Lock failed:", err);
+        setupVideoWakeLockFallback();
+      }
+    } else {
+      setupVideoWakeLockFallback();
+    }
+  }
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") {
+      requestWakeLock();
+    }
+  });
+
+  function setupVideoWakeLockFallback() {
+    if (document.getElementById("wake-lock-fallback-video")) return;
+    try {
+      const v = document.createElement("video");
+      v.id = "wake-lock-fallback-video";
+      v.setAttribute("playsinline", "");
+      v.setAttribute("loop", "");
+      v.muted = true;
+      v.style.position = "fixed";
+      v.style.left = "-9999px";
+      v.style.width = "1px";
+      v.style.height = "1px";
+      v.style.opacity = "0.001";
+      v.style.pointerEvents = "none";
+      document.body.appendChild(v);
+      v.play().catch(() => {});
+    } catch (e) {
+      console.warn("Wake lock fallback error:", e);
+    }
+  }
 
   // ----------------- AUDIO SYNTHESIZER (100% OFFLINE) ----------------- //
 
@@ -182,11 +234,13 @@
 
     console.log("Processing valid barcode scan:", code);
 
+    const isPlaying = tvVideo && !tvVideo.paused && !tvVideo.ended && tvVideo.readyState > 2;
+
     // Send to backend
     fetch("/api/scan", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ code: code })
+      body: JSON.stringify({ code: code, is_video_playing: isPlaying })
     })
       .then((res) => res.json())
       .then((data) => {
@@ -251,6 +305,7 @@
     if (!data) return;
 
     if (data.status === "success") {
+      hideSleepingScreen();
       if (data.is_surprise) {
         playSound("surprise");
       } else {
@@ -261,12 +316,19 @@
       updateStarsUI();
       displayMediaItem(data.item, data.limit_reached);
     } else if (data.status === "parent_unlock") {
+      hideSleepingScreen();
       playSound("unlock");
       showUnlockCelebration();
       endPauseScreen();
       sessionState.current_scans = 0;
       updateStarsUI();
       showWelcomeScreen();
+    } else if (data.status === "schedule_blocked") {
+      playSound("error");
+      showSleepingScreen(data.reason);
+    } else if (data.status === "video_playing_ignored") {
+      playSound("error");
+      showErrorToast(data.message || "Aguarde o desenho terminar!");
     } else if (data.status === "in_pause") {
       playSound("error");
       showPauseScanWarning();
@@ -281,7 +343,31 @@
 
   // ----------------- VIEW SWITCHING & RENDERING ----------------- //
 
+  function showSleepingScreen(reason) {
+    if (!sleepingScreen) return;
+    welcomeScreen.classList.remove("active");
+    mediaScreen.classList.remove("active");
+    pauseScreen.classList.remove("active");
+    if (tvVideo) {
+      tvVideo.pause();
+      tvVideo.src = "";
+    }
+    if (tvImage) tvImage.src = "";
+    if (metaOverlay) metaOverlay.classList.remove("visible");
+    if (sleepingReason) {
+      sleepingReason.textContent = reason || "Hora de descansar os olhinhos!";
+    }
+    sleepingScreen.classList.add("active");
+  }
+
+  function hideSleepingScreen() {
+    if (sleepingScreen) {
+      sleepingScreen.classList.remove("active");
+    }
+  }
+
   function showWelcomeScreen() {
+    hideSleepingScreen();
     welcomeScreen.classList.add("active");
     mediaScreen.classList.remove("active");
     pauseScreen.classList.remove("active");
@@ -355,7 +441,7 @@
       .catch((err) => console.error("Pause trigger error:", err));
   }
 
-  function startPauseScreen(remainingSec, totalSec) {
+  function startPauseScreen(remainingSec, totalSec, challenge) {
     sessionState.is_paused = true;
     sessionState.remaining_pause_seconds = remainingSec;
     sessionState.total_pause_seconds = totalSec || remainingSec;
@@ -364,7 +450,15 @@
     metaOverlay.classList.remove("visible");
     welcomeScreen.classList.remove("active");
     mediaScreen.classList.remove("active");
+    hideSleepingScreen();
     pauseScreen.classList.add("active");
+
+    if (challenge && pauseChallengeBox && pauseChallengeText) {
+      pauseChallengeBox.style.display = "block";
+      pauseChallengeText.textContent = challenge;
+    } else if (pauseChallengeBox) {
+      pauseChallengeBox.style.display = "none";
+    }
 
     updatePauseTimerDisplay();
 
@@ -515,24 +609,108 @@
       .catch((e) => console.warn("Session sync error:", e));
   }
 
+  // ----------------- WATCH TIME REPORTING (TIME LIMIT MODE) ----------------- //
+  setInterval(() => {
+    if (tvVideo && !tvVideo.paused && !tvVideo.ended && tvVideo.readyState > 2 && !sessionState.is_paused) {
+      fetch("/api/session/report-watch-time", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ seconds: 5.0 })
+      })
+        .then((r) => r.json())
+        .then((data) => {
+          if (data && data.is_paused) {
+            tvVideo.pause();
+            startPauseScreen(data.remaining_seconds || (sessionState.pause_minutes * 60), data.total_pause_seconds);
+          }
+        })
+        .catch((e) => console.warn("Watch time report error:", e));
+    }
+  }, 5000);
+
+  // ----------------- RECONNECTION RESILIENCE ----------------- //
+  let reconnectInterval = null;
+
+  function showConnectionToast() {
+    if (connectionToast) {
+      connectionToast.classList.add("active", "show");
+    }
+  }
+
+  function hideConnectionToast() {
+    if (connectionToast) {
+      connectionToast.classList.remove("active", "show");
+    }
+  }
+
+  function startPollingReconnect() {
+    if (reconnectInterval) return;
+    showConnectionToast();
+    reconnectInterval = setInterval(() => {
+      fetch("/api/session/status")
+        .then((r) => {
+          if (r.ok) return r.json();
+          throw new Error("Server offline");
+        })
+        .then((s) => {
+          clearInterval(reconnectInterval);
+          reconnectInterval = null;
+          hideConnectionToast();
+
+          sessionState.current_scans = s.current_scans;
+          sessionState.max_scans = s.max_scans;
+          sessionState.sound_enabled = s.sound_enabled;
+          sessionState.title_display_seconds = s.title_display_seconds;
+          updateStarsUI();
+
+          if (s.is_paused) {
+            startPauseScreen(s.remaining_pause_seconds, s.total_pause_seconds);
+          } else if (sessionState.is_paused) {
+            endPauseScreen();
+          }
+        })
+        .catch(() => {
+          // Keep retrying every 3s
+        });
+    }, 3000);
+  }
+
   // Server-Sent Events for real-time synchronization
   function initSSE() {
     const evtSource = new EventSource("/api/events");
 
+    evtSource.onopen = () => {
+      hideConnectionToast();
+      if (reconnectInterval) {
+        clearInterval(reconnectInterval);
+        reconnectInterval = null;
+      }
+    };
+
     evtSource.addEventListener("message", (e) => {
+      hideConnectionToast();
       try {
         const msg = JSON.parse(e.data);
         if (msg.type === "play_drawing") {
           handleScanResponse(msg.data);
         } else if (msg.type === "pause_started") {
-          startPauseScreen(msg.data.remaining_seconds, msg.data.total_pause_seconds);
-        } else if (msg.type === "pause_unlocked") {
+          startPauseScreen(msg.data.remaining_seconds, msg.data.total_pause_seconds, msg.data.challenge);
+        } else if (msg.type === "pause_unlocked" || msg.type === "schedule_unlocked") {
           playSound("unlock");
           showUnlockCelebration();
           endPauseScreen();
+          hideSleepingScreen();
           sessionState.current_scans = 0;
           updateStarsUI();
           showWelcomeScreen();
+        } else if (msg.type === "tv_blocked") {
+          if (msg.data.blocked) {
+            playSound("error");
+            showSleepingScreen(msg.data.reason || "A TV foi bloqueada pelos pais.");
+          } else {
+            hideSleepingScreen();
+            showWelcomeScreen();
+          }
         } else if (msg.type === "settings_updated") {
           loadReaderProfile();
           if (msg.data.sound_enabled !== undefined) {
@@ -542,8 +720,10 @@
             sessionState.max_scans = parseInt(msg.data.max_scans, 10);
             updateStarsUI();
           }
+          checkScheduleStatus();
         } else if (msg.type === "session_reset") {
           endPauseScreen();
+          hideSleepingScreen();
           sessionState.current_scans = 0;
           updateStarsUI();
           showWelcomeScreen();
@@ -554,16 +734,35 @@
     });
 
     evtSource.onerror = () => {
-      // EventSource automatically retries connection
-      console.warn("SSE connection interrupted, retrying...");
+      console.warn("SSE connection interrupted, starting reconnection polling...");
+      startPollingReconnect();
     };
   }
 
+  function checkScheduleStatus() {
+    fetch("/api/schedule/status")
+      .then((r) => r.json())
+      .then((s) => {
+        if (!s.allowed) {
+          showSleepingScreen(s.reason);
+        } else if (sleepingScreen && sleepingScreen.classList.contains("active")) {
+          hideSleepingScreen();
+          showWelcomeScreen();
+        }
+      })
+      .catch((e) => console.warn("Schedule check error:", e));
+  }
+
+  // Periodic check of schedule every 30s in case bedtime window crosses
+  setInterval(checkScheduleStatus, 30000);
+
   // Boot
   document.addEventListener("DOMContentLoaded", () => {
+    requestWakeLock();
     ensureInputFocus();
     loadReaderProfile();
     syncSessionStatus();
+    checkScheduleStatus();
     initSSE();
   });
 })();

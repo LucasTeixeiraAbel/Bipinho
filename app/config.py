@@ -26,7 +26,9 @@ DEFAULT_SETTINGS = {
     # Session & Limit
     "max_scans": "3",
     "pause_minutes": "18",
-    "count_mode": "leituras",          # "leituras" or "desenhos_diferentes"
+    "count_mode": "leituras",          # "leituras", "desenhos_diferentes", "tempo_assistido"
+    "watch_time_limit_minutes": "15",
+    "video_scan_behavior": "interrupt", # "interrupt" or "ignore"
     "pause_unlock_mode": "ambas",       # "ambas", "tempo", "codigo_pais"
     
     # Timing & Audio
@@ -46,6 +48,18 @@ DEFAULT_SETTINGS = {
     "login_max_attempts": "5",          # Failed attempts before lockout
     "login_lockout_minutes": "15",      # Lockout duration in minutes
     
+    # Parental Controls — Schedule
+    "schedule_enabled": "0",            # "0" = off, "1" = on
+    "max_sessions_per_day": "0",        # 0 = unlimited
+    "allowed_start_time": "07:00",      # HH:MM
+    "allowed_end_time": "21:00",        # HH:MM
+    "allowed_days": "0,1,2,3,4,5,6",   # 0=Mon..6=Sun (CSV)
+    "tv_blocked": "0",                  # Admin can manually block TV
+
+    # Mascot & UX
+    "mascot_enabled": "1",              # Show animated mascot on idle screen
+    "movement_challenges_enabled": "1", # Show movement challenges during pause
+
     # Barcode Reader Profile (Active Type)
     "reader_type": "USB",              # "USB", "Bluetooth", "2.4G"
     

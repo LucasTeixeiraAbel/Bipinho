@@ -944,3 +944,140 @@ input:focus, select:focus {
   margin-top: 10px;
   color: #1e293b;
 }
+
+/* ----------------- ETAPA 3: PARENTAL & LIVE PANEL ----------------- */
+.live-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.live-card {
+  background: white;
+  border-radius: var(--radius-md);
+  padding: 20px;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+}
+
+.live-card-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+
+.live-card-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.live-card-value.live-big {
+  font-size: 24px;
+  color: var(--primary);
+}
+
+.live-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.live-controls .btn {
+  flex: 1 1 200px;
+  padding: 12px 18px;
+  font-size: 15px;
+}
+
+.weekday-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.weekday-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: #f1f5f9;
+  border: 1px solid var(--border);
+  border-radius: 9999px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+}
+
+.weekday-chip:hover {
+  background: #e2e8f0;
+}
+
+.weekday-chip input {
+  cursor: pointer;
+}
+
+.challenge-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  background: #f8fafc;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  margin-bottom: 8px;
+}
+
+.challenge-row input[type="text"] {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 14px;
+}
+
+.data-table th,
+.data-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.data-table th {
+  background: #f8fafc;
+  color: var(--text-muted);
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 12px;
+}
+
+/* Mobile responsive adjustments */
+@media (max-width: 768px) {
+  .live-grid {
+    grid-template-columns: 1fr;
+  }
+  .live-controls {
+    flex-direction: column;
+  }
+  .live-controls .btn {
+    width: 100%;
+  }
+  .weekday-chip {
+    padding: 6px 10px;
+    font-size: 13px;
+  }
+}

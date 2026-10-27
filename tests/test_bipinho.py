@@ -118,6 +118,9 @@ def test_full_bipinho_flow():
     res = client.post("/admin/login", data={"password": "senha_errada"})
     assert res.status_code == 401
 
+    # Mark password as changed so test user can access dashboard directly
+    set_setting("admin_password_changed", "1")
+
     # Correct password -> login success with cookie
     res = client.post("/admin/login", data={"password": "bipinho123"}, follow_redirects=False)
     assert res.status_code == 303

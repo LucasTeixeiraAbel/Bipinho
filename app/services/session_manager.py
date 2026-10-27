@@ -1,6 +1,6 @@
 import asyncio
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timezone, date as dt_date
 from typing import Dict, Any, Optional, List
 
 from app.database import (
@@ -12,11 +12,20 @@ from app.database import (
     increment_item_views,
     get_session_state,
     update_session_state,
-    reset_session
+    reset_session,
+    get_today_session_count,
+    start_daily_session,
+    end_daily_session,
+    record_view_history,
+    get_random_challenge,
 )
 
 # Active SSE client queues
 _sse_clients: List[asyncio.Queue] = []
+
+# Track the current daily session DB row id (in-memory; resets on server restart)
+_current_daily_session_id: Optional[int] = None
+_session_started_at: Optional[str] = None
 
 def add_sse_client() -> asyncio.Queue:
     q = asyncio.Queue()
@@ -95,36 +104,67 @@ def get_current_session_info() -> Dict[str, Any]:
         "sound_enabled": settings.get("sound_enabled", "1") == "1",
         "title_display_seconds": int(settings.get("title_display_seconds", 30)),
         "reader_type": settings.get("reader_type", "USB"),
+        "video_scan_behavior": settings.get("video_scan_behavior", "interrupt"),
+        "watched_seconds": state.get("watched_seconds", 0.0),
+        "watch_time_limit_minutes": int(settings.get("watch_time_limit_minutes", 15)),
+        "mascot_enabled": settings.get("mascot_enabled", "1") == "1",
+        "movement_challenges_enabled": settings.get("movement_challenges_enabled", "1") == "1",
     }
 
 async def trigger_coloring_pause() -> Dict[str, Any]:
-    """Transitions system into 'Hora de colorir!' pause."""
-    now_iso = datetime.now().isoformat()
+    """Transitions system into 'Hora de colorir!' pause and records daily session."""
+    global _current_daily_session_id
+    now = datetime.now()
+    now_iso = now.isoformat()
     settings = get_all_settings()
     pause_minutes = int(settings.get("pause_minutes", 18))
-    
+
+    # Record session end in daily_sessions
+    if _current_daily_session_id:
+        state = get_session_state()
+        end_daily_session(
+            session_id=_current_daily_session_id,
+            ended_at=now_iso,
+            total_watched_seconds=float(state.get("watched_seconds", 0.0)),
+            scans_count=int(state.get("current_scans", 0)),
+            items_list=state.get("scanned_items", []),
+        )
+        _current_daily_session_id = None
+
+    # Reset any exceptional unlock when session completes
+    from app.database import set_setting
+    set_setting("exceptional_unlock", "0")
+
     update_session_state(
         is_paused=1,
         pause_started_at=now_iso
     )
-    
+
+    # Pick a random movement challenge
+    challenge = None
+    if settings.get("movement_challenges_enabled", "1") == "1":
+        challenge = get_random_challenge()
+
     data = {
         "is_paused": True,
         "pause_minutes": pause_minutes,
         "remaining_seconds": pause_minutes * 60,
-        "total_pause_seconds": pause_minutes * 60
+        "total_pause_seconds": pause_minutes * 60,
+        "challenge": challenge,
     }
     await broadcast_event("pause_started", data)
     return data
 
 async def unlock_coloring_pause(by_parents: bool = False) -> Dict[str, Any]:
-    """Unlocks pause and resets stars."""
+    """Unlocks pause and resets session counter."""
+    global _current_daily_session_id
+    _current_daily_session_id = None
     reset_session()
     data = {"is_paused": False, "by_parents": by_parents}
     await broadcast_event("pause_unlocked", data)
     return data
 
-async def handle_barcode_scan(code: str) -> Dict[str, Any]:
+async def handle_barcode_scan(code: str, is_video_playing: bool = False) -> Dict[str, Any]:
     """
     Main business logic for processing barcode reads.
     Handles parent unlock, surprise code, debounce, drawing lookup,
@@ -145,10 +185,15 @@ async def handle_barcode_scan(code: str) -> Dict[str, Any]:
 
     # 1. PARENT UNLOCK CODE
     if clean_code == parent_unlock_code:
+        # Clear manual block and grant exceptional schedule access
+        from app.database import set_setting
+        set_setting("tv_blocked", "0")
+        set_setting("exceptional_unlock", "1")
         await unlock_coloring_pause(by_parents=True)
+        await broadcast_event("schedule_unlocked", {"status": "unlocked_by_parent"})
         return {
             "status": "parent_unlock",
-            "message": "Pausa liberada pelos pais! Contador reiniciado.",
+            "message": "Pausa e bloqueios liberados pelos pais! TV liberada.",
             "session": get_current_session_info()
         }
 
@@ -160,6 +205,13 @@ async def handle_barcode_scan(code: str) -> Dict[str, Any]:
             "message": "Hora de colorir! Bipes de desenhos estão pausados.",
             "remaining_seconds": pause_status.get("remaining_seconds", 0),
             "pause_minutes": pause_status.get("pause_minutes", 18)
+        }
+
+    # 2.5 VIDEO PLAYING IGNORED (if configured)
+    if is_video_playing and settings.get("video_scan_behavior") == "ignore":
+        return {
+            "status": "video_playing_ignored",
+            "message": "Desenho em reprodução. Aguarde terminar para bipar outro!"
         }
 
     # 3. REPEAT DEBOUNCE CHECK
@@ -210,6 +262,24 @@ async def handle_barcode_scan(code: str) -> Dict[str, Any]:
     count_mode = settings.get("count_mode", "leituras")
     scanned_items = state.get("scanned_items", [])
 
+    # --- Start a daily session record on first scan ---
+    global _current_daily_session_id
+    if current_scans == 0 and _current_daily_session_id is None:
+        today_str = now.date().isoformat()
+        today_count = get_today_session_count(today_str)
+        _current_daily_session_id = start_daily_session(
+            date_str=today_str,
+            session_num=today_count + 1,
+            started_at=now_iso,
+        )
+
+    # Record view history
+    record_view_history(
+        item_id=item_id,
+        item_code=target_item["code"],
+        item_title=target_item["title"],
+    )
+
     increment = False
     if count_mode == "desenhos_diferentes":
         if item_id not in scanned_items:
@@ -223,7 +293,11 @@ async def handle_barcode_scan(code: str) -> Dict[str, Any]:
         if item_id not in scanned_items:
             scanned_items.append(item_id)
 
-    limit_reached = current_scans >= max_scans
+    if count_mode == "tempo_assistido":
+        watch_limit_sec = int(settings.get("watch_time_limit_minutes", 15)) * 60
+        limit_reached = float(state.get("watched_seconds", 0.0)) >= watch_limit_sec
+    else:
+        limit_reached = current_scans >= max_scans
 
     # Save session state
     update_session_state(

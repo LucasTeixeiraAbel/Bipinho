@@ -208,46 +208,70 @@ O leitor de código de barras funciona exatamente como um teclado USB/Bluetooth:
 Na rota `/admin` você pode ajustar em tempo real:
 - **Limite de sessões:** Quantas estrelas a criança acumula antes de entrar na pausa (padrão: 3).
 - **Duração da pausa:** Tempo de exibição da tela "Hora de colorir!" com cronômetro visual (padrão: 18 minutos).
-- **Modo de contagem:** Contar por *leituras* (permite repetir o desenho favorito) ou por *desenhos diferentes*.
+- **Modo de contagem:** Contar por *leituras*, *desenhos diferentes* ou *por tempo assistido* (inicia a pausa após X minutos acumulados).
+- **Comportamento de bipe durante vídeo:** `Interromper e trocar imediatamente` ou `Ignorar até o vídeo terminar`.
 - **Liberação da pausa:** Automática ao fim do cronômetro, apenas por código dos pais ou ambas.
 - **Debounce:** Tempo configurável para ignorar bipes repetidos acidentais (padrão: 3 segundos).
 - **Perfil do Leitor (USB, 2.4G ou Bluetooth):** Troca imediata sem reiniciar o servidor.
 - **Simular Bipe:** Permite testar a TV remotamente digitando o código ou clicando em "Bipar na TV" em qualquer desenho cadastrado.
-- **Estatísticas:** Lista com os desenhos mais vistos e contagem total de visualizações.
+- **Estatísticas & Favoritos:** Lista com os desenhos mais vistos e contagem total de visualizações.
+- **Backup & Restauração:** Exporta um arquivo `.zip` com banco e mídias, ou restaura backups anteriores com validação e segurança.
 - **Troca de Senha:** Altere a sua senha de acesso a qualquer momento com confirmação e hash PBKDF2.
 
 ---
 
-## 🛡️ 8. Segurança & Diagnóstico do Sistema
+## 👨‍👩‍👧 8. Controle dos Pais & Monitoramento em Tempo Real (Etapa 3)
 
-O Bipinho conta com uma camada robusta de proteção familiar e monitoramento técnico contínuo:
+O Bipinho oferece ferramentas completas para os pais gerenciarem e acompanharem o uso da TV:
 
-- **Troca Obrigatória de Senha no 1º Acesso:** Impede o uso contínuo de credenciais padrão. No primeiro login, o sistema bloqueia o acesso ao painel até que uma senha pessoal nova e segura seja definida.
-- **Armazenamento Criptográfico Seguro:** Senhas nunca são salvas em texto puro; utiliza-se **PBKDF2-HMAC-SHA256** com 100.000 iterações e salt aleatório individual de 16 bytes por senha.
-- **Proteção contra Força Bruta (Rate Limiting por IP):** Bloqueio temporário automático de 15 minutos (configurável) após 5 tentativas incorretas consecutivas vindas do mesmo IP, impedindo ataques automatizados.
-- **Restrição de Acesso à Administração:** Opção de limitar o painel `/admin` exclusivamente ao computador servidor (`localhost_only`), bloqueando tentativas de acesso a partir de celulares, tablets ou da própria TV na rede doméstica.
-- **Aba de Diagnóstico Técnico (`/admin`):**
-  - **Detecção do FFmpeg:** Identifica se o binário está no PATH, exibindo a versão ou alerta explicativo com passos de instalação.
-  - **Espaço Livre em Disco:** Mede o armazenamento disponível na partição do servidor em GB e porcentagem.
-  - **Integridade do Banco SQLite:** Executa `PRAGMA integrity_check` e reporta a saúde e tamanho do arquivo `.db`.
-  - **Alerta de Suspensão de Energia:** Detecta se o Windows está configurado para suspender a atividade ao ficar ocioso na tomada, alertando para evitar quedas no sinal da TV.
+- **Agenda e Limites de Uso Diário:**
+  - **Horário permitido:** Defina a janela de início e término (ex: 07:00 às 21:00).
+  - **Dias da semana:** Escolha os dias em que a TV pode ser usada (Seg a Dom).
+  - **Máximo de sessões por dia:** Limita quantas sessões completas de desenhos a criança pode assistir no dia.
+  - **Tela "O Bipinho está dormindo":** Fora dos horários ou dias permitidos, a TV exibe um mascote sonolento amigável com explicação visual clara.
+  - **Chave dos Pais Excepcional:** Bipar o cartão secreto dos pais (`PAIS-LIBERAR-99`) libera a TV excepcionalmente para aquela sessão, acordando o Bipinho mesmo fora do horário.
+- **Painel ao Vivo (Responsivo para Celular):**
+  - Acompanhe em tempo real na aba **"📺 Painel ao Vivo"** o desenho que está tocando, o progresso das estrelas e o tempo assistido.
+  - Botões de controle imediato: **▶️ Encerrar Pausa Agora**, **🔒 Bloquear TV** e **🔓 Liberar TV**.
+- **Histórico Semanal com Gráfico SVG:**
+  - Visualize o tempo de tela diário e o número de sessões dos últimos 7 dias em um gráfico de barras limpo, feito em SVG puro (sem bibliotecas externas).
+  - Tabela com os desenhos mais vistos e tempo total assistido a cada dia.
+- **Importação em Lote de Pastas do Servidor (📂):**
+  - Informe o caminho de uma pasta do PC com vários vídeos/imagens. O sistema cadastra todos automaticamente, gera miniaturas, atribui códigos Code128 e avisa sobre vídeos muito longos ou em resolução muito alta (> 1080p).
+- **Cartões de Impressão Separados:**
+  - A folha A4 separa a **Chave dos Pais** em uma página própria com aviso em destaque: *"⚠️ NÃO COLOCAR NA PASTINHA DA CRIANÇA"*. O cartão Surpresa permanece junto aos cartões normais.
+- **Desafios de Movimento na Pausa:**
+  - 15 sugestões pré-cadastradas (ex: "Dê 10 pulinhos!", "Gire como um bailarino!") sorteadas durante a pausa "Hora de colorir!" para incentivar atividade física.
 
 ---
 
-## 🧪 9. Testes Automatizados
+## 🛡️ 9. Segurança & Confiabilidade na TV
 
-O sistema inclui suítes completas de testes automatizados com cobertura total:
+- **Screen Wake Lock & Fallback:** Impede a TV de apagar a tela durante o uso com fallback de vídeo mudo para Android TVs antigas.
+- **Reconexão Automática com Overlay Amigável:** Quando a conexão SSE cai ou o servidor reinicia, a TV exibe *"Bipinho já volta!"* e reconecta sozinha mantendo as estrelas.
+- **Troca Obrigatória de Senha no 1º Acesso:** PBKDF2-HMAC-SHA256 com 100.000 iterações e salt de 16 bytes.
+- **Proteção contra Força Bruta (Rate Limiting por IP):** Bloqueio temporário após 5 tentativas incorretas.
+- **Restrição de IP:** Opção de permitir acesso à administração exclusivamente pelo PC local (`localhost_only`).
+- **Diagnóstico do Sistema:** Monitoramento de FFmpeg, disco, integridade do banco e suspensão de energia do Windows.
 
-### Testes de Segurança & Diagnóstico (Etapa 1)
-Valida PBKDF2 com salt, obrigatoriedade de troca de senha no 1º acesso, bloqueio por força bruta (rate limiting), restrição de IP para localhost, API de diagnóstico e alertas de FFmpeg:
+---
+
+## 🧪 10. Testes Automatizados
+
+Execute os testes no terminal dentro da pasta do projeto:
+
 ```bash
+# Testes de Segurança & Diagnóstico (Etapa 1 - 6 testes)
 python -m tests.test_etapa1
-```
-Resultado: **6/6 testes aprovados com sucesso.**
 
-### Testes de Fluxo Completo e Regras de Negócio
-Cobre streaming com Range RFC 7233, geração de códigos de barra SVG, leitura de bipes, debounce, contagem de sessões, pausa, desbloqueio secreto dos pais, autenticação e perfil do leitor:
-```bash
+# Testes de Confiabilidade na TV & Backup (Etapa 2 - 9 testes)
+python -m tests.test_etapa2
+
+# Testes de Controle dos Pais, Agenda, Histórico e Importação (Etapa 3 - 10 testes)
+python -m tests.test_etapa3
+
+# Teste de Fluxo Completo Original (15 testes)
 python -m tests.test_bipinho
 ```
-Resultado: **15/15 testes aprovados com sucesso.**
+
+Todas as 4 suítes (totalizando **40 testes**) passam com 100% de sucesso!

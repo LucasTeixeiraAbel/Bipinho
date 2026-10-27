@@ -31,6 +31,9 @@
 
       if (target === "tab-stats") loadStats();
       if (target === "tab-diagnostics") loadDiagnostics();
+      if (target === "tab-live") loadLiveStatus();
+      if (target === "tab-history") loadHistory();
+      if (target === "tab-parental") { loadParentalSettings(); loadChallenges(); }
       if (target === "tab-tester") {
         setTimeout(() => document.getElementById("tester-input").focus(), 100);
       }
@@ -324,6 +327,12 @@
         document.getElementById("cfg-login-max-attempts").value = cfg.login_max_attempts || 5;
         document.getElementById("cfg-login-lockout-minutes").value = cfg.login_lockout_minutes || 15;
 
+        // Etapa 2 new settings
+        const watchLimitEl = document.getElementById("cfg-watch-time-limit");
+        if (watchLimitEl) watchLimitEl.value = cfg.watch_time_limit_minutes || 15;
+        const videoScanEl = document.getElementById("cfg-video-scan-behavior");
+        if (videoScanEl) videoScanEl.value = cfg.video_scan_behavior || "interrupt";
+
         // Radio count_mode
         const countMode = cfg.count_mode || "leituras";
         const countRadio = document.querySelector(`input[name="count_mode"][value="${countMode}"]`);
@@ -356,7 +365,9 @@
       surprise_enabled: document.getElementById("cfg-surprise-toggle").value,
       admin_access_restriction: document.getElementById("cfg-access-restriction").value,
       login_max_attempts: document.getElementById("cfg-login-max-attempts").value,
-      login_lockout_minutes: document.getElementById("cfg-login-lockout-minutes").value
+      login_lockout_minutes: document.getElementById("cfg-login-lockout-minutes").value,
+      watch_time_limit_minutes: (document.getElementById("cfg-watch-time-limit") || {}).value || "15",
+      video_scan_behavior: (document.getElementById("cfg-video-scan-behavior") || {}).value || "interrupt"
     };
 
     fetch("/api/admin/settings", {
@@ -719,6 +730,538 @@
       .replace(/"/g, "&quot;")
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;");
+  }
+
+  // ----------------- BACKUP & RESTORE ----------------- //
+
+  const formRestoreBackup = document.getElementById("form-restore-backup");
+  if (formRestoreBackup) {
+    formRestoreBackup.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const status = document.getElementById("restore-status");
+      const fileInput = document.getElementById("restore-zip-input") || document.getElementById("backup-file");
+      if (!fileInput || !fileInput.files.length) {
+        status.className = "status-msg error";
+        status.textContent = "Selecione um arquivo .zip de backup.";
+        return;
+      }
+      if (!confirm("⚠️ ATENÇÃO: Restaurar o backup substituirá TODOS os dados atuais (desenhos, configurações e mídias). Deseja continuar?")) {
+        return;
+      }
+      const formData = new FormData();
+      formData.append("file", fileInput.files[0]);
+      status.className = "status-msg";
+      status.textContent = "Restaurando backup, aguarde...";
+      fetch("/api/admin/backup/restore", {
+        method: "POST",
+        body: formData
+      })
+        .then((r) => r.json().then((d) => ({ ok: r.ok, body: d })))
+        .then(({ ok, body }) => {
+          if (ok) {
+            status.className = "status-msg success";
+            status.textContent = "✅ " + (body.message || "Backup restaurado com sucesso!");
+            loadItems();
+            loadSettings();
+          } else {
+            status.className = "status-msg error";
+            status.textContent = "❌ " + (body.detail || "Erro ao restaurar backup.");
+          }
+        })
+        .catch((err) => {
+          status.className = "status-msg error";
+          status.textContent = "❌ Erro inesperado: " + err;
+        });
+    });
+  }
+
+  // ----------------- ETAPA 3: PARENTAL SETTINGS ----------------- //
+
+  function loadParentalSettings() {
+    fetch("/api/admin/settings")
+      .then((r) => r.json())
+      .then((s) => {
+        const scheduleEnabled = document.getElementById("cfg-schedule-enabled");
+        if (scheduleEnabled) scheduleEnabled.value = s.schedule_enabled || "0";
+
+        const maxSessions = document.getElementById("cfg-max-sessions");
+        if (maxSessions) maxSessions.value = s.max_sessions_per_day || "0";
+
+        const startTime = document.getElementById("cfg-start-time");
+        if (startTime) startTime.value = s.allowed_start_time || "07:00";
+
+        const endTime = document.getElementById("cfg-end-time");
+        if (endTime) endTime.value = s.allowed_end_time || "21:00";
+
+        const mascotEnabled = document.getElementById("cfg-mascot-enabled");
+        if (mascotEnabled) mascotEnabled.value = s.mascot_enabled !== undefined ? s.mascot_enabled : "1";
+
+        const challengesEnabled = document.getElementById("cfg-challenges-enabled");
+        if (challengesEnabled) challengesEnabled.value = s.movement_challenges_enabled !== undefined ? s.movement_challenges_enabled : "1";
+
+        // Days of week checkboxes
+        const allowedDays = (s.allowed_days || "0,1,2,3,4,5,6").split(",").map((d) => d.trim());
+        document.querySelectorAll(".day-checkbox").forEach((cb) => {
+          cb.checked = allowedDays.includes(cb.value);
+        });
+      })
+      .catch((e) => console.error("Error loading parental settings:", e));
+  }
+
+  const formParentalSettings = document.getElementById("form-parental-settings");
+  if (formParentalSettings) {
+    formParentalSettings.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const statusEl = document.getElementById("parental-settings-status");
+      statusEl.className = "status-msg";
+      statusEl.textContent = "Salvando...";
+
+      const selectedDays = [];
+      document.querySelectorAll(".day-checkbox:checked").forEach((cb) => {
+        selectedDays.push(cb.value);
+      });
+
+      const payload = {
+        schedule_enabled: document.getElementById("cfg-schedule-enabled").value,
+        max_sessions_per_day: document.getElementById("cfg-max-sessions").value,
+        allowed_start_time: document.getElementById("cfg-start-time").value,
+        allowed_end_time: document.getElementById("cfg-end-time").value,
+        allowed_days: selectedDays.join(","),
+        mascot_enabled: document.getElementById("cfg-mascot-enabled").value,
+        movement_challenges_enabled: document.getElementById("cfg-challenges-enabled").value
+      };
+
+      fetch("/api/admin/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ settings: payload })
+      })
+        .then((r) => r.json())
+        .then((res) => {
+          if (res.status === "success") {
+            statusEl.className = "status-msg success";
+            statusEl.textContent = "Configurações dos pais salvas com sucesso!";
+            setTimeout(() => (statusEl.textContent = ""), 3000);
+          } else {
+            statusEl.className = "status-msg error";
+            statusEl.textContent = "Erro ao salvar.";
+          }
+        })
+        .catch((err) => {
+          statusEl.className = "status-msg error";
+          statusEl.textContent = "Erro: " + err;
+        });
+    });
+  }
+
+  // ----------------- ETAPA 3: MOVEMENT CHALLENGES ----------------- //
+
+  let challengesData = [];
+
+  function loadChallenges() {
+    fetch("/api/admin/challenges")
+      .then((r) => r.json())
+      .then((d) => {
+        challengesData = d.challenges || [];
+        renderChallengesList();
+      })
+      .catch((e) => console.error("Error loading challenges:", e));
+  }
+
+  function renderChallengesList() {
+    const listEl = document.getElementById("challenges-list");
+    if (!listEl) return;
+
+    if (challengesData.length === 0) {
+      listEl.innerHTML = "<p style='color:#64748b; font-size:13px;'>Nenhum desafio cadastrado. Clique em '+ Adicionar Desafio'.</p>";
+      return;
+    }
+
+    listEl.innerHTML = challengesData
+      .map(
+        (c, idx) => `
+        <div class="challenge-row" data-idx="${idx}">
+          <input type="checkbox" ${c.enabled ? "checked" : ""} class="ch-enabled" title="Ativar/desativar">
+          <input type="text" value="${escapeHtml(c.challenge)}" class="ch-text" placeholder="Sugestão de movimento...">
+          <button type="button" class="btn btn-danger btn-xs btn-remove-ch" data-idx="${idx}">🗑️</button>
+        </div>
+      `
+      )
+      .join("");
+
+    listEl.querySelectorAll(".btn-remove-ch").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const idx = parseInt(btn.getAttribute("data-idx"), 10);
+        challengesData.splice(idx, 1);
+        renderChallengesList();
+      });
+    });
+  }
+
+  const btnAddChallenge = document.getElementById("btn-add-challenge");
+  if (btnAddChallenge) {
+    btnAddChallenge.addEventListener("click", () => {
+      challengesData.push({ challenge: "Novo desafio de movimento!", enabled: 1 });
+      renderChallengesList();
+      const inputs = document.querySelectorAll(".challenge-row .ch-text");
+      if (inputs.length) inputs[inputs.length - 1].focus();
+    });
+  }
+
+  const btnSaveChallenges = document.getElementById("btn-save-challenges");
+  if (btnSaveChallenges) {
+    btnSaveChallenges.addEventListener("click", () => {
+      const rows = document.querySelectorAll(".challenge-row");
+      const listToSave = [];
+      rows.forEach((row) => {
+        const text = row.querySelector(".ch-text").value.trim();
+        const enabled = row.querySelector(".ch-enabled").checked;
+        if (text) {
+          listToSave.push({ challenge: text, enabled: enabled ? 1 : 0 });
+        }
+      });
+
+      const statusEl = document.getElementById("challenges-status");
+      statusEl.className = "status-msg";
+      statusEl.textContent = "Salvando lista...";
+
+      fetch("/api/admin/challenges", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ challenges: listToSave })
+      })
+        .then((r) => r.json())
+        .then((res) => {
+          if (res.status === "success") {
+            statusEl.className = "status-msg success";
+            statusEl.textContent = `Salvo com sucesso! (${res.count} desafios)`;
+            loadChallenges();
+            setTimeout(() => (statusEl.textContent = ""), 3000);
+          } else {
+            statusEl.className = "status-msg error";
+            statusEl.textContent = "Erro ao salvar lista.";
+          }
+        })
+        .catch((err) => {
+          statusEl.className = "status-msg error";
+          statusEl.textContent = "Erro: " + err;
+        });
+    });
+  }
+
+  // ----------------- ETAPA 3: BULK IMPORT ----------------- //
+
+  const btnBulkImport = document.getElementById("btn-bulk-import");
+  if (btnBulkImport) {
+    btnBulkImport.addEventListener("click", () => {
+      const folderInput = document.getElementById("bulk-folder-path");
+      const authorInput = document.getElementById("bulk-author");
+      const statusEl = document.getElementById("bulk-import-status");
+      const resultsEl = document.getElementById("bulk-import-results");
+
+      const folderPath = folderInput ? folderInput.value.trim() : "";
+      const author = authorInput ? authorInput.value.trim() || "Família" : "Família";
+
+      if (!folderPath) {
+        alert("Por favor, informe o caminho completo da pasta no servidor.");
+        return;
+      }
+
+      btnBulkImport.disabled = true;
+      btnBulkImport.textContent = "Importando arquivos, aguarde...";
+      statusEl.className = "status-msg";
+      statusEl.textContent = "Lendo e processando arquivos...";
+      resultsEl.style.display = "none";
+      resultsEl.innerHTML = "";
+
+      fetch("/api/admin/bulk-import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ folder_path: folderPath, author: author })
+      })
+        .then((r) => r.json().then((d) => ({ ok: r.ok, body: d })))
+        .then(({ ok, body }) => {
+          btnBulkImport.disabled = false;
+          btnBulkImport.textContent = "📂 Importar Pasta";
+
+          if (ok && body.status === "success") {
+            statusEl.className = "status-msg success";
+            statusEl.textContent = `Importação concluída! ${body.imported_count} item(ns) importado(s).`;
+            loadItems();
+
+            let detailsHtml = "<div class='card' style='background:#f8fafc; border:1px solid #cbd5e1; padding:16px;'>";
+            detailsHtml += `<h4>Resultado da Importação: ${body.imported_count} sucesso, ${body.error_count} erro(s)</h4>`;
+
+            if (body.imported.length) {
+              detailsHtml += "<ul style='margin-top:8px; padding-left:20px; font-size:13px;'>";
+              body.imported.forEach((it) => {
+                const warn = it.warning ? ` <span style='color:#f59e0b;'>⚠️ ${it.warning}</span>` : "";
+                detailsHtml += `<li><strong>${it.code}</strong> — ${it.title} (${it.file})${warn}</li>`;
+              });
+              detailsHtml += "</ul>";
+            }
+
+            if (body.errors.length) {
+              detailsHtml += "<div style='color:#ef4444; margin-top:10px; font-size:13px;'><strong>Falhas:</strong><ul>";
+              body.errors.forEach((err) => {
+                detailsHtml += `<li>${err.file}: ${err.error}</li>`;
+              });
+              detailsHtml += "</ul></div>";
+            }
+            detailsHtml += "</div>";
+
+            resultsEl.innerHTML = detailsHtml;
+            resultsEl.style.display = "block";
+          } else {
+            statusEl.className = "status-msg error";
+            statusEl.textContent = "Erro: " + (body.detail || "Falha na importação.");
+          }
+        })
+        .catch((err) => {
+          btnBulkImport.disabled = false;
+          btnBulkImport.textContent = "📂 Importar Pasta";
+          statusEl.className = "status-msg error";
+          statusEl.textContent = "Erro inesperado: " + err;
+        });
+    });
+  }
+
+  // ----------------- ETAPA 3: LIVE PANEL ----------------- //
+
+  function loadLiveStatus() {
+    fetch("/api/admin/live-status")
+      .then((r) => r.json())
+      .then((st) => {
+        renderLiveStatus(st);
+      })
+      .catch((e) => console.error("Error loading live status:", e));
+  }
+
+  function renderLiveStatus(st) {
+    const curItemEl = document.getElementById("live-current-item");
+    if (curItemEl) {
+      if (st.current_item) {
+        curItemEl.textContent = `🎬 ${st.current_item.title} (${st.current_item.code})`;
+      } else {
+        curItemEl.textContent = "— Aguardando bipe";
+      }
+    }
+
+    const starsEl = document.getElementById("live-stars");
+    if (starsEl) {
+      starsEl.textContent = `⭐ ${st.current_scans || 0} / ${st.max_scans || 3}`;
+    }
+
+    const watchTimeEl = document.getElementById("live-watch-time");
+    if (watchTimeEl) {
+      const mins = Math.floor((st.watched_seconds || 0) / 60);
+      const secs = Math.floor((st.watched_seconds || 0) % 60);
+      watchTimeEl.textContent = `${mins}m ${secs}s (Limite: ${st.watch_time_limit_minutes || 15}m)`;
+    }
+
+    const pauseEl = document.getElementById("live-pause-info");
+    if (pauseEl) {
+      if (st.is_paused) {
+        const remMins = Math.ceil((st.remaining_pause_seconds || 0) / 60);
+        pauseEl.innerHTML = `<span style="color:#f59e0b;">⏸️ Em Pausa (${remMins} min restantes)</span>`;
+      } else {
+        pauseEl.innerHTML = `<span style="color:#10b981;">▶️ TV Liberada para assistir</span>`;
+      }
+    }
+
+    const schedEl = document.getElementById("live-schedule-info");
+    if (schedEl) {
+      if (st.tv_blocked) {
+        schedEl.innerHTML = `<span style="color:#ef4444;">🔒 TV Bloqueada Manualmente</span>`;
+      } else if (st.schedule && !st.schedule.allowed) {
+        schedEl.innerHTML = `<span style="color:#818cf8;">😴 Bipinho Dormindo (${st.schedule.reason})</span>`;
+      } else {
+        schedEl.innerHTML = `<span style="color:#10b981;">✅ Horário Permitido</span>`;
+      }
+    }
+  }
+
+  // Live control buttons
+  const btnLiveRefresh = document.getElementById("btn-live-refresh");
+  if (btnLiveRefresh) btnLiveRefresh.addEventListener("click", loadLiveStatus);
+
+  const btnLiveEndPause = document.getElementById("btn-live-end-pause");
+  if (btnLiveEndPause) {
+    btnLiveEndPause.addEventListener("click", () => {
+      fetch("/api/admin/session/end-pause", { method: "POST" })
+        .then((r) => r.json())
+        .then(() => {
+          showLiveStatusMsg("Pausa encerrada!", "success");
+          loadLiveStatus();
+        });
+    });
+  }
+
+  const btnLiveBlockTv = document.getElementById("btn-live-block-tv");
+  if (btnLiveBlockTv) {
+    btnLiveBlockTv.addEventListener("click", () => {
+      fetch("/api/admin/tv/block", { method: "POST" })
+        .then((r) => r.json())
+        .then(() => {
+          showLiveStatusMsg("TV bloqueada com sucesso!", "error");
+          loadLiveStatus();
+        });
+    });
+  }
+
+  const btnLiveReleaseTv = document.getElementById("btn-live-release-tv");
+  if (btnLiveReleaseTv) {
+    btnLiveReleaseTv.addEventListener("click", () => {
+      fetch("/api/admin/tv/release", { method: "POST" })
+        .then((r) => r.json())
+        .then(() => {
+          showLiveStatusMsg("TV liberada com sucesso!", "success");
+          loadLiveStatus();
+        });
+    });
+  }
+
+  const btnLiveResetSession = document.getElementById("btn-live-reset-session");
+  if (btnLiveResetSession) {
+    btnLiveResetSession.addEventListener("click", () => {
+      fetch("/api/admin/reset-session", { method: "POST" })
+        .then((r) => r.json())
+        .then(() => {
+          showLiveStatusMsg("Sessão reiniciada!", "success");
+          loadLiveStatus();
+        });
+    });
+  }
+
+  function showLiveStatusMsg(msg, type) {
+    const el = document.getElementById("live-control-status");
+    if (!el) return;
+    el.className = `status-msg ${type}`;
+    el.textContent = msg;
+    setTimeout(() => (el.textContent = ""), 3000);
+  }
+
+  // Auto-refresh live panel when active
+  setInterval(() => {
+    const liveTab = document.getElementById("tab-live");
+    if (liveTab && liveTab.classList.contains("active")) {
+      loadLiveStatus();
+    }
+  }, 4000);
+
+  // ----------------- ETAPA 3: HISTORY & SVG CHART ----------------- //
+
+  function loadHistory() {
+    fetch("/api/admin/history?days=7")
+      .then((r) => r.json())
+      .then((data) => {
+        renderHistoryChart(data.history || []);
+        renderHistoryTable(data.history || []);
+      })
+      .catch((e) => console.error("Error loading history:", e));
+  }
+
+  const btnHistoryRefresh = document.getElementById("btn-history-refresh");
+  if (btnHistoryRefresh) btnHistoryRefresh.addEventListener("click", loadHistory);
+
+  function renderHistoryChart(history) {
+    const svg = document.getElementById("history-chart");
+    if (!svg) return;
+
+    if (!history || history.length === 0) {
+      svg.innerHTML = "<text x='350' y='100' text-anchor='middle' fill='#94a3b8'>Sem histórico disponível</text>";
+      return;
+    }
+
+    // Convert seconds to minutes for each day
+    const dayData = history.map((h) => {
+      const mins = Math.round((h.total_watched_seconds || 0) / 60);
+      const parts = (h.date || "").split("-");
+      const label = parts.length === 3 ? `${parts[2]}/${parts[1]}` : h.date;
+      return { date: h.date, label: label, minutes: mins, sessions: h.session_count || 0 };
+    });
+
+    const maxMinutes = Math.max(...dayData.map((d) => d.minutes), 30); // at least 30 min scale
+
+    const svgWidth = 700;
+    const svgHeight = 200;
+    const paddingLeft = 50;
+    const paddingBottom = 30;
+    const paddingTop = 20;
+    const chartWidth = svgWidth - paddingLeft - 20;
+    const chartHeight = svgHeight - paddingTop - paddingBottom;
+
+    const barWidth = Math.floor(chartWidth / dayData.length) - 20;
+
+    let svgHtml = "";
+
+    // Background horizontal grid lines
+    const gridLines = [0, 0.5, 1];
+    gridLines.forEach((pct) => {
+      const y = paddingTop + chartHeight * (1 - pct);
+      const val = Math.round(maxMinutes * pct);
+      svgHtml += `<line x1="${paddingLeft}" y1="${y}" x2="${svgWidth - 20}" y2="${y}" stroke="#e2e8f0" stroke-dasharray="4,4" />`;
+      svgHtml += `<text x="${paddingLeft - 8}" y="${y + 4}" font-size="11" fill="#94a3b8" text-anchor="end">${val}m</text>`;
+    });
+
+    // Bars
+    dayData.forEach((d, idx) => {
+      const x = paddingLeft + idx * (barWidth + 20) + 10;
+      const h = (d.minutes / maxMinutes) * chartHeight;
+      const y = paddingTop + (chartHeight - h);
+
+      // Bar
+      const barColor = d.minutes > 0 ? "#3b82f6" : "#e2e8f0";
+      svgHtml += `
+        <rect x="${x}" y="${y}" width="${barWidth}" height="${Math.max(2, h)}" rx="6" fill="${barColor}">
+          <title>${d.label}: ${d.minutes} min (${d.sessions} sessões)</title>
+        </rect>
+      `;
+
+      // Value on top of bar
+      if (d.minutes > 0) {
+        svgHtml += `<text x="${x + barWidth / 2}" y="${Math.max(14, y - 6)}" font-size="11" font-weight="bold" fill="#1e293b" text-anchor="middle">${d.minutes}m</text>`;
+      }
+
+      // Day label at bottom
+      svgHtml += `<text x="${x + barWidth / 2}" y="${svgHeight - 10}" font-size="12" fill="#64748b" text-anchor="middle">${d.label}</text>`;
+    });
+
+    svg.innerHTML = svgHtml;
+  }
+
+  function renderHistoryTable(history) {
+    const tbody = document.getElementById("history-table-body");
+    if (!tbody) return;
+
+    if (!history || history.length === 0) {
+      tbody.innerHTML = "<tr><td colspan='4' style='text-align:center; color:#94a3b8;'>Nenhum histórico registrado ainda.</td></tr>";
+      return;
+    }
+
+    tbody.innerHTML = history
+      .slice()
+      .reverse()
+      .map((h) => {
+        const totalSec = h.total_watched_seconds || 0;
+        const mins = Math.floor(totalSec / 60);
+        const secs = Math.floor(totalSec % 60);
+        const timeFormatted = mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
+
+        const topDrawings = (h.top_items || [])
+          .map((t) => `${t.item_title} (${t.plays}x)`)
+          .join(", ") || "—";
+
+        return `
+          <tr>
+            <td><strong>${formatDate(h.date)}</strong></td>
+            <td>${h.session_count || 0}</td>
+            <td>${timeFormatted}</td>
+            <td style="color:#64748b; font-size:13px;">${topDrawings}</td>
+          </tr>
+        `;
+      })
+      .join("");
   }
 
   // Boot

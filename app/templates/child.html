@@ -95,10 +95,29 @@
           <div id="pause-scan-warning" class="pause-friendly-warning">
             Ainda estamos colorindo! O Bipinho volta logo...
           </div>
+          <!-- Movement Challenge Box (Etapa 4 ready, active in Etapa 3 if enabled) -->
+          <div id="pause-challenge-box" class="pause-challenge-box" style="display:none;">
+            <div class="challenge-badge">🤸 Desafio de Movimento</div>
+            <div id="pause-challenge-text" class="challenge-text"></div>
+          </div>
         </div>
       </section>
 
-      <!-- 4. FRIENDLY UNKNOWN CODE TOAST -->
+      <!-- 4. SLEEPING SCREEN ("O Bipinho está dormindo") -->
+      <section id="sleeping-screen" class="view-layer">
+        <div class="sleeping-content">
+          <div class="sleeping-mascot">
+            <span class="sleeping-mascot-emoji">😴💤</span>
+          </div>
+          <h1 class="sleeping-title">O Bipinho está dormindo...</h1>
+          <p id="sleeping-reason" class="sleeping-subtitle">Hora de descansar os olhinhos!</p>
+          <div class="sleeping-hint">
+            <span>🔑 A chave dos pais pode liberar a qualquer momento</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 5. FRIENDLY UNKNOWN CODE TOAST -->
       <div id="error-toast" class="error-toast-layer">
         <div class="error-toast-card">
           <div class="error-toast-icon">🔍</div>
@@ -115,6 +134,15 @@
           <div class="unlock-toast-icon">✨</div>
           <h3>Liberado pelos pais!</h3>
           <p>Bipinho pronto para um novo desenho!</p>
+        </div>
+      </div>
+
+      <!-- 6. CONNECTION DISCONNECTED OVERLAY -->
+      <div id="connection-toast" class="connection-toast-layer">
+        <div class="connection-toast-card">
+          <div class="connection-icon-anim">📺✨</div>
+          <h3>Bipinho já volta!</h3>
+          <p>Reconectando com o servidor...</p>
         </div>
       </div>
     </main>

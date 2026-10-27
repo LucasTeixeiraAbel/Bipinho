@@ -28,6 +28,45 @@ def is_ffmpeg_installed() -> bool:
     except Exception:
         return False
 
+def probe_video(video_path: Path) -> dict:
+    """Probes video duration, width, height and codec using ffprobe if available."""
+    info = {"duration": None, "width": None, "height": None, "codec": None}
+    if not is_ffmpeg_installed():
+        return info
+    try:
+        cmd = [
+            "ffprobe", "-v", "error", "-show_entries",
+            "format=duration:stream=width,height,codec_name",
+            "-of", "default=noprint_wrappers=1", str(video_path)
+        ]
+        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=8, text=True)
+        if res.returncode == 0:
+            for line in res.stdout.splitlines():
+                if "=" in line:
+                    k, v = line.split("=", 1)
+                    k = k.strip()
+                    v = v.strip()
+                    if k == "duration":
+                        try:
+                            info["duration"] = float(v)
+                        except ValueError:
+                            pass
+                    elif k == "width":
+                        try:
+                            info["width"] = int(v)
+                        except ValueError:
+                            pass
+                    elif k == "height":
+                        try:
+                            info["height"] = int(v)
+                        except ValueError:
+                            pass
+                    elif k == "codec_name" and not info["codec"]:
+                        info["codec"] = v
+    except Exception:
+        pass
+    return info
+
 def extract_video_thumbnail(video_path: Path, thumb_path: Path) -> bool:
     """Extract a thumbnail from video at 1s mark."""
     if not is_ffmpeg_installed():
@@ -151,7 +190,19 @@ def save_and_process_media(
         if not thumb_ok:
             create_default_placeholder_thumb(thumb_path, title, media_type)
 
-        return media_type, final_filename, thumb_name, warning
+        # Video diagnostics & warnings (duration, resolution)
+        warnings_list = []
+        if warning:
+            warnings_list.append(warning)
+        info = probe_video(final_path)
+        if info.get("duration") and info["duration"] > 1800:
+            mins = int(info["duration"] // 60)
+            warnings_list.append(f"Vídeo longo ({mins} min). Vídeos curtos facilitam o controle de tela e intervalos.")
+        if info.get("width") and (info["width"] > 1920 or (info.get("height") and info["height"] > 1080)):
+            warnings_list.append(f"Resolução alta detectada ({info['width']}x{info.get('height')}). Na TV pode causar lentidão.")
+
+        final_warning = " • ".join(warnings_list) if warnings_list else None
+        return media_type, final_filename, thumb_name, final_warning
 
     else:
         raise ValueError(f"Formato de arquivo não suportado ({ext}). Envie imagens ou vídeos.")
