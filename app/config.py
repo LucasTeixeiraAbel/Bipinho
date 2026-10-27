@@ -10,11 +10,12 @@ TEMPLATES_DIR = APP_DIR / "templates"
 MEDIA_DIR = BASE_DIR / "media"
 UPLOADS_DIR = MEDIA_DIR / "uploads"
 THUMBS_DIR = MEDIA_DIR / "thumbs"
+OUTLINES_DIR = MEDIA_DIR / "outlines"
 DATA_DIR = BASE_DIR / "data"
 DB_PATH = DATA_DIR / "bipinho.db"
 
 # Ensure runtime directories exist
-for folder in [MEDIA_DIR, UPLOADS_DIR, THUMBS_DIR, DATA_DIR, STATIC_DIR]:
+for folder in [MEDIA_DIR, UPLOADS_DIR, THUMBS_DIR, OUTLINES_DIR, DATA_DIR, STATIC_DIR]:
     folder.mkdir(parents=True, exist_ok=True)
 
 # Server Defaults

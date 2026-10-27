@@ -33,19 +33,47 @@
       <!-- 1. WELCOME SCREEN -->
       <section id="welcome-screen" class="view-layer active">
         <div class="welcome-content">
-          <div class="mascot-icon">
-            <svg class="tv-mascot-svg" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <rect x="15" y="25" width="90" height="70" rx="20" fill="#3B82F6"/>
-              <rect x="25" y="35" width="70" height="50" rx="12" fill="#E0F2FE"/>
-              <!-- Happy Face -->
-              <circle cx="45" cy="55" r="5" fill="#1E3A8A"/>
-              <circle cx="75" cy="55" r="5" fill="#1E3A8A"/>
-              <path d="M50 67 C55 75, 65 75, 70 67" stroke="#1E3A8A" stroke-width="4" stroke-linecap="round"/>
-              <!-- Antennas -->
-              <line x1="60" y1="25" x2="40" y2="10" stroke="#F59E0B" stroke-width="5" stroke-linecap="round"/>
-              <circle cx="38" cy="9" r="5" fill="#EF4444"/>
-              <line x1="60" y1="25" x2="80" y2="10" stroke="#F59E0B" stroke-width="5" stroke-linecap="round"/>
-              <circle cx="82" cy="9" r="5" fill="#10B981"/>
+          <div class="mascot-icon" id="mascot-container">
+            <svg class="tv-mascot-svg" id="bipinho-mascot-svg" viewBox="0 0 140 140" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <!-- Scanner Antenna / Light -->
+              <line x1="70" y1="28" x2="70" y2="12" stroke="#F59E0B" stroke-width="4" stroke-linecap="round"/>
+              <circle cx="70" cy="10" r="6" fill="#EF4444" class="mascot-light"/>
+              
+              <!-- Left Trigger / Ear -->
+              <rect x="18" y="52" width="10" height="24" rx="5" fill="#2563EB"/>
+
+              <!-- Right Waving Arm -->
+              <g class="mascot-arm" id="mascot-arm">
+                <path d="M 112 60 Q 128 42 130 26" stroke="#2563EB" stroke-width="8" stroke-linecap="round" fill="none"/>
+                <circle cx="130" cy="24" r="6" fill="#F59E0B"/>
+              </g>
+
+              <!-- Main Scanner Body -->
+              <rect x="25" y="28" width="90" height="76" rx="22" fill="#3B82F6"/>
+              <!-- Glass Screen Face -->
+              <rect x="36" y="38" width="68" height="56" rx="14" fill="#EFF6FF"/>
+
+              <!-- Soft Red Laser Scanline at top of screen -->
+              <line x1="42" y1="44" x2="98" y2="44" stroke="#EF4444" stroke-width="2.5" stroke-linecap="round" opacity="0.8" class="mascot-laser"/>
+
+              <!-- Blinking Eyes -->
+              <g class="mascot-eyes">
+                <ellipse cx="53" cy="62" rx="5.5" ry="6.5" fill="#1E3A8A" class="mascot-eye eye-left"/>
+                <circle cx="55" cy="59" r="2" fill="#FFFFFF"/>
+                <ellipse cx="87" cy="62" rx="5.5" ry="6.5" fill="#1E3A8A" class="mascot-eye eye-right"/>
+                <circle cx="89" cy="59" r="2" fill="#FFFFFF"/>
+              </g>
+
+              <!-- Cheeks -->
+              <circle cx="45" cy="72" r="4.5" fill="#F472B6" opacity="0.6"/>
+              <circle cx="95" cy="72" r="4.5" fill="#F472B6" opacity="0.6"/>
+
+              <!-- Smiling Mouth -->
+              <path d="M 58 74 Q 70 86 82 74" stroke="#1E3A8A" stroke-width="3.5" stroke-linecap="round" fill="none" class="mascot-mouth"/>
+
+              <!-- Feet / Base -->
+              <rect x="52" y="104" width="36" height="14" rx="7" fill="#1D4ED8"/>
+              <rect x="42" y="116" width="56" height="10" rx="5" fill="#F59E0B"/>
             </svg>
           </div>
           <h1 class="brand-title">Bipinho</h1>

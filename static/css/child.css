@@ -156,6 +156,74 @@ html, body {
   max-height: 220px;
   filter: drop-shadow(0 15px 30px rgba(59, 130, 246, 0.4));
   margin-bottom: 2vh;
+  overflow: visible;
+}
+
+/* Mascot Blinking Animation */
+.mascot-eye {
+  transform-origin: center;
+  animation: mascotBlink 4s infinite ease-in-out;
+}
+
+@keyframes mascotBlink {
+  0%, 46%, 50%, 100% {
+    transform: scaleY(1);
+  }
+  48% {
+    transform: scaleY(0.08);
+  }
+}
+
+/* Mascot Waving Arm */
+.mascot-arm {
+  transform-origin: 112px 60px;
+  animation: mascotWave 3s infinite ease-in-out;
+}
+
+@keyframes mascotWave {
+  0%, 100% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(-18deg);
+  }
+}
+
+/* Mascot Laser Pulse */
+.mascot-laser {
+  animation: laserPulse 2s infinite alternate ease-in-out;
+}
+
+@keyframes laserPulse {
+  0% {
+    opacity: 0.3;
+    transform: translateY(-2px);
+  }
+  100% {
+    opacity: 0.95;
+    transform: translateY(2px);
+  }
+}
+
+/* Mascot Excited Celebration on Valid Scan */
+.mascot-icon.scan-cheer .tv-mascot-svg {
+  animation: mascotCheerJump 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.mascot-icon.scan-cheer .mascot-arm {
+  animation: mascotFastWave 0.2s infinite alternate ease-in-out;
+}
+
+@keyframes mascotCheerJump {
+  0% { transform: scale(1) translateY(0); }
+  40% { transform: scale(1.22) translateY(-28px); filter: drop-shadow(0 20px 40px rgba(245, 158, 11, 0.8)); }
+  75% { transform: scale(1.08) translateY(-10px); }
+  100% { transform: scale(1) translateY(0); }
+}
+
+@keyframes mascotFastWave {
+  0% { transform: rotate(-30deg); }
+  100% { transform: rotate(15deg); }
 }
 
 .brand-title {

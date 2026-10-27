@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Bipinho — Desenho para Colorir: {{ item.title }}</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    }
+
+    body {
+      background: #f1f5f9;
+      color: #0f172a;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+    }
+
+    /* Print toolbar */
+    .print-bar {
+      position: sticky;
+      top: 10px;
+      z-index: 100;
+      background: #1e293b;
+      color: white;
+      padding: 12px 24px;
+      border-radius: 12px;
+      display: flex;
+      gap: 16px;
+      align-items: center;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.25);
+      margin-bottom: 20px;
+    }
+
+    .btn {
+      padding: 8px 16px;
+      font-size: 14px;
+      font-weight: 700;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      text-decoration: none;
+    }
+
+    .btn-print {
+      background: #10b981;
+      color: white;
+    }
+    .btn-print:hover { background: #059669; }
+
+    .btn-back {
+      background: #475569;
+      color: white;
+    }
+
+    /* A4 Coloring Sheet */
+    .a4-sheet {
+      background: #ffffff;
+      width: 210mm;
+      min-height: 297mm;
+      padding: 14mm 16mm;
+      box-shadow: 0 4px 25px rgba(0,0,0,0.15);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      border-radius: 6px;
+      position: relative;
+    }
+
+    /* Header */
+    .sheet-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      border-bottom: 2px solid #0f172a;
+      padding-bottom: 8px;
+    }
+
+    .brand-title {
+      font-size: 24px;
+      font-weight: 900;
+      color: #1e3a8a;
+    }
+
+    .sheet-tagline {
+      font-size: 12px;
+      color: #64748b;
+      font-weight: 600;
+    }
+
+    .category-badge {
+      font-size: 11px;
+      font-weight: 800;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      color: white;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    /* Coloring Container */
+    .drawing-box {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 15px 0;
+      min-height: 180mm;
+    }
+
+    .outline-img {
+      max-width: 100%;
+      max-height: 175mm;
+      object-fit: contain;
+      border: 2px dashed #cbd5e1;
+      border-radius: 12px;
+      padding: 8px;
+      background: white;
+    }
+
+    .drawing-caption {
+      margin-top: 10px;
+      text-align: center;
+    }
+
+    .drawing-title {
+      font-size: 20px;
+      font-weight: 900;
+      color: #0f172a;
+    }
+
+    .drawing-meta {
+      font-size: 12px;
+      color: #64748b;
+      margin-top: 2px;
+    }
+
+    /* Footer with Barcode */
+    .sheet-footer {
+      border-top: 2px dashed #94a3b8;
+      padding-top: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .barcode-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .barcode-svg-box {
+      width: 180px;
+      height: 44px;
+    }
+
+    .barcode-svg-box svg {
+      width: 100%;
+      height: 100%;
+    }
+
+    .barcode-text {
+      font-family: monospace;
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 1px;
+      margin-top: 2px;
+    }
+
+    .instructions-box {
+      max-width: 320px;
+      font-size: 11px;
+      color: #475569;
+      line-height: 1.4;
+      text-align: right;
+    }
+
+    .instructions-box strong {
+      color: #1e3a8a;
+    }
+
+    @media print {
+      body {
+        background: white;
+        padding: 0;
+      }
+      .no-print {
+        display: none !important;
+      }
+      .a4-sheet {
+        box-shadow: none;
+        width: 100%;
+        min-height: 100vh;
+        padding: 10mm 12mm;
+      }
+      @page {
+        size: A4 portrait;
+        margin: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Print Controls -->
+  <header class="print-bar no-print">
+    <button class="btn btn-print" onclick="window.print()">🖨️ Imprimir Desenho para Colorir (Ctrl+P)</button>
+    <a href="/admin" class="btn btn-back">← Voltar ao Painel</a>
+  </header>
+
+  <!-- Printable A4 Sheet -->
+  <main class="a4-sheet">
+    <!-- Header -->
+    <div class="sheet-header">
+      <div>
+        <h1 class="brand-title">Bipinho 🖍️</h1>
+        <p class="sheet-tagline">Hora de Colorir • Descanse os olhinhos e solte a imaginação!</p>
+      </div>
+      <span class="category-badge" style="background-color: {{ category_color }};">
+        {{ item.category or 'Geral' }}
+      </span>
+    </div>
+
+    <!-- Outline Drawing -->
+    <div class="drawing-box">
+      <img src="{{ outline_url }}" alt="{{ item.title }}" class="outline-img">
+      <div class="drawing-caption">
+        <h2 class="drawing-title">{{ item.title }}</h2>
+        <p class="drawing-meta">{{ item.author }} • Data: {{ item.date }}</p>
+      </div>
+    </div>
+
+    <!-- Footer Barcode & TV scanner hint -->
+    <div class="sheet-footer">
+      <div class="barcode-container">
+        <div class="barcode-svg-box">
+          {{ barcode_svg | safe }}
+        </div>
+        <span class="barcode-text">{{ item.code }}</span>
+      </div>
+      <div class="instructions-box">
+        <p><strong>Dica divertida:</strong> Depois de colorir seu desenho, aponte o leitor de código de barras para o código ao lado para assistir na TV!</p>
+      </div>
+    </div>
+  </main>
+</body>
+</html>

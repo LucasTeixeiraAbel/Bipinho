@@ -144,7 +144,8 @@ def seed_sample_data():
         date="2026-10-18",
         media_type="image",
         filename=bear_path.name,
-        thumb_filename=thumb_bear.name
+        thumb_filename=thumb_bear.name,
+        category="Animais"
     )
 
     # 2. Rocket
@@ -158,7 +159,8 @@ def seed_sample_data():
         date="2026-10-18",
         media_type="image",
         filename=rocket_path.name,
-        thumb_filename=thumb_rocket.name
+        thumb_filename=thumb_rocket.name,
+        category="Histórias"
     )
 
     # 3. Fish
@@ -172,7 +174,8 @@ def seed_sample_data():
         date="2026-10-18",
         media_type="image",
         filename=fish_path.name,
-        thumb_filename=thumb_fish.name
+        thumb_filename=thumb_fish.name,
+        category="Animais"
     )
 
     # 4. Animated Video
@@ -187,7 +190,8 @@ def seed_sample_data():
             date="2026-10-18",
             media_type="video",
             filename=vid_path.name,
-            thumb_filename=thumb_vid.name
+            thumb_filename=thumb_vid.name,
+            category="Músicas"
         )
 
     print("Starter sample drawings created successfully!")

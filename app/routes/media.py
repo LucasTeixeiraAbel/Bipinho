@@ -2,7 +2,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Response
 from starlette.responses import FileResponse
 
-from app.config import UPLOADS_DIR, THUMBS_DIR
+from app.config import UPLOADS_DIR, THUMBS_DIR, OUTLINES_DIR
 from app.services.barcode_service import generate_code128_svg
 
 router = APIRouter()
@@ -25,6 +25,13 @@ async def get_thumbnail(filename: str):
     safe_path = (THUMBS_DIR / filename).resolve()
     if not str(safe_path).startswith(str(THUMBS_DIR.resolve())) or not safe_path.exists():
         raise HTTPException(status_code=404, detail="Miniatura não encontrada")
+    return FileResponse(safe_path, headers={"Cache-Control": "public, max-age=86400"})
+
+@router.get("/media/outlines/{filename}")
+async def get_outline(filename: str):
+    safe_path = (OUTLINES_DIR / filename).resolve()
+    if not str(safe_path).startswith(str(OUTLINES_DIR.resolve())) or not safe_path.exists():
+        raise HTTPException(status_code=404, detail="Desenho para colorir não encontrado")
     return FileResponse(safe_path, headers={"Cache-Control": "public, max-age=86400"})
 
 @router.get("/api/barcode/{code}.svg")

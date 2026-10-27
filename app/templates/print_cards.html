@@ -141,11 +141,81 @@
       background: #ffffff;
       break-inside: avoid;
       page-break-inside: avoid;
+      overflow: hidden;
+    }
+
+    /* Category Stripe at top of card */
+    .card-category-stripe {
+      width: 100%;
+      height: 6px;
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+
+    /* Card Size Variants */
+    .size-2 .cards-grid {
+      grid-template-columns: 1fr;
+      gap: 12mm;
+    }
+    .size-2 .drawing-card {
+      padding: 18px;
+    }
+    .size-2 .card-thumb-box {
+      height: 170px;
+    }
+    .size-2 .card-title {
+      font-size: 20px;
+    }
+    .size-2 .barcode-svg-box {
+      height: 64px;
+    }
+
+    .size-1 .cards-grid {
+      grid-template-columns: 1fr;
+      gap: 0;
+    }
+    .size-1 .drawing-card {
+      padding: 24px;
+      border: 3px dashed #f59e0b;
+      min-height: 250mm;
+      justify-content: space-around;
+      background: #fffdf5;
+    }
+    .size-1 .treasure-hunt-badge {
+      font-size: 16px;
+      font-weight: 900;
+      color: #b45309;
+      background: #fef3c7;
+      border: 2px solid #f59e0b;
+      border-radius: 9999px;
+      padding: 6px 18px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 12px;
+    }
+    .size-1 .card-thumb-box {
+      height: 120mm;
+      border-radius: 16px;
+    }
+    .size-1 .card-title {
+      font-size: 30px;
+      margin-top: 10px;
+    }
+    .size-1 .card-author {
+      font-size: 15px;
+    }
+    .size-1 .barcode-svg-box {
+      height: 80px;
+      width: 80%;
+    }
+    .size-1 .barcode-text {
+      font-size: 18px;
     }
 
     .cut-guide-corner {
       position: absolute;
-      top: -8px;
+      top: 6px;
       left: 10px;
       background: white;
       padding: 0 4px;
@@ -281,12 +351,24 @@
       <span id="items-info" style="font-size: 13px; color: #94a3b8;">Carregando desenhos...</span>
     </div>
     <div class="toolbar-controls">
+      <label class="checkbox-label" style="font-weight: 600;">
+        Tamanho:
+        <select id="sel-card-size" style="padding: 4px 8px; border-radius: 6px; font-weight: bold; background: white; color: #1e293b; border: 1px solid #cbd5e1;">
+          <option value="6" selected>Padrão (6 por folha)</option>
+          <option value="2">Grandes (2 por folha)</option>
+          <option value="1">Caça ao Tesouro (1 por folha)</option>
+        </select>
+      </label>
+      <label class="checkbox-label">
+        <input type="checkbox" id="chk-group-category">
+        Agrupar por Categoria
+      </label>
       <label class="checkbox-label">
         <input type="checkbox" id="chk-special" checked>
-        Incluir Cartões Especiais (Pais & Surpresa)
+        Incluir Especiais (Pais / Surpresa)
       </label>
-      <button class="btn btn-print" onclick="window.print()">🖨️ Imprimir Folha (Ctrl + P)</button>
-      <a href="/admin" class="btn btn-back">← Voltar ao Painel</a>
+      <button class="btn btn-print" onclick="window.print()">🖨️ Imprimir (Ctrl + P)</button>
+      <a href="/admin" class="btn btn-back">← Voltar</a>
     </div>
   </header>
 
@@ -317,12 +399,29 @@
         });
       }
 
+      const catColors = {
+        'Animais': '#10b981',
+        'Músicas': '#f59e0b',
+        'Histórias': '#3b82f6',
+        'Educativos': '#8b5cf6',
+        'Geral': '#64748b'
+      };
+
       function renderPages() {
         const container = document.getElementById('sheet-container');
         const includeSpecial = document.getElementById('chk-special').checked;
+        const cardSize = parseInt(document.getElementById('sel-card-size').value, 10) || 6;
+        const groupByCategory = document.getElementById('chk-group-category').checked;
+
+        // Set wrapper size class
+        container.className = `sheet-wrapper size-${cardSize}`;
 
         // Build list of normal cards for the child's folder (including Surprise drawing)
         let normalCards = [...allItems];
+
+        if (groupByCategory) {
+          normalCards.sort((a, b) => (a.category || 'Geral').localeCompare(b.category || 'Geral'));
+        }
 
         if (includeSpecial && settings.surprise_enabled !== '0') {
           const surpriseCode = settings.surprise_code || 'BIP-SURPRESA';
@@ -332,6 +431,7 @@
             code: surpriseCode,
             title: 'Desenho Surpresa!',
             author: 'Sorteia um desenho aleatório',
+            category: 'Surpresa',
             badge: 'Bipinho • Surpresa 🎲',
             icon: '🎲'
           });
@@ -355,8 +455,7 @@
           return;
         }
 
-        // 6 cards per A4 page (2 columns x 3 rows) for the child's folder
-        const CARDS_PER_PAGE = 6;
+        const CARDS_PER_PAGE = cardSize;
         const totalChildPages = Math.ceil(normalCards.length / CARDS_PER_PAGE) || 1;
 
         let html = '';
@@ -364,12 +463,19 @@
           const pageCards = normalCards.slice(p * CARDS_PER_PAGE, (p + 1) * CARDS_PER_PAGE);
           if (pageCards.length === 0) continue;
 
+          let pageSubtitle = `Cartões para Pastinha da Criança • Página ${p + 1} de ${totalChildPages}`;
+          if (cardSize === 1) {
+            pageSubtitle = `Caça ao Tesouro (1 por folha) • Página ${p + 1} de ${totalChildPages}`;
+          } else if (cardSize === 2) {
+            pageSubtitle = `Cartões Grandes (2 por folha) • Página ${p + 1} de ${totalChildPages}`;
+          }
+
           html += `
             <div class="a4-page">
               <div class="page-header">
                 <div class="header-logo">
                   <h1>Bipinho</h1>
-                  <span class="header-desc">Cartões para Pastinha da Criança • Página ${p + 1} de ${totalChildPages}</span>
+                  <span class="header-desc">${pageSubtitle}</span>
                 </div>
                 <div style="font-size: 11px; color: #94a3b8;">
                   Recorte nas linhas tracejadas ✂
@@ -377,7 +483,7 @@
               </div>
 
               <div class="cards-grid">
-                ${pageCards.map(c => renderCardHtml(c)).join('')}
+                ${pageCards.map(c => renderCardHtml(c, cardSize)).join('')}
               </div>
             </div>
           `;
@@ -417,7 +523,7 @@
               </div>
 
               <div class="cards-grid" style="grid-template-columns: 1fr; max-width: 320px; margin: 0 auto;">
-                ${renderCardHtml(parentCard)}
+                ${renderCardHtml(parentCard, 6)}
               </div>
             </div>
           `;
@@ -438,7 +544,7 @@
         });
       }
 
-      function renderCardHtml(item) {
+      function renderCardHtml(item, size) {
         if (item.isSpecial) {
           const specialClass = item.type === 'parent' ? 'special-card-parent' : 'special-card-surprise';
           return `
@@ -458,11 +564,22 @@
           `;
         }
 
+        const catName = item.category || 'Geral';
+        const catColor = catColors[catName] || '#64748b';
         const thumbUrl = `/media/thumbs/${item.thumb_filename}`;
+
+        const treasureHeader = (size === 1)
+          ? `<div class="treasure-hunt-badge">🏆 Caça ao Tesouro • Ache e Bipe!</div>`
+          : '';
+
         return `
           <div class="drawing-card">
+            <div class="card-category-stripe" style="background-color: ${catColor};"></div>
             <div class="cut-guide-corner">✂ cortar</div>
-            <span class="card-badge">Bipinho 📺</span>
+            ${treasureHeader}
+            <span class="card-badge" style="background-color: ${catColor}20; color: ${catColor}; font-weight: 800;">
+              ${catName}
+            </span>
             <div class="card-thumb-box">
               <img src="${thumbUrl}" alt="${item.title}" onerror="this.src='/static/icons/default_thumb.svg'">
             </div>
@@ -477,6 +594,8 @@
       }
 
       document.getElementById('chk-special').addEventListener('change', renderPages);
+      document.getElementById('sel-card-size').addEventListener('change', renderPages);
+      document.getElementById('chk-group-category').addEventListener('change', renderPages);
 
       document.addEventListener('DOMContentLoaded', loadData);
     })();

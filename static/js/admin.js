@@ -141,12 +141,23 @@
             ? '<span class="badge-media-type video">Vídeo</span>'
             : '<span class="badge-media-type image">Imagem</span>';
 
+        const catName = item.category || "Geral";
+        const catColorMap = {
+          "Animais": "#10b981",
+          "Músicas": "#f59e0b",
+          "Histórias": "#3b82f6",
+          "Educativos": "#8b5cf6",
+          "Geral": "#64748b"
+        };
+        const catColor = catColorMap[catName] || "#64748b";
+
         return `
         <div class="media-item-card">
           <div class="media-thumb-wrapper">
             <img src="${thumbUrl}" alt="${item.title}" onerror="this.src='/static/icons/default_thumb.svg'">
             ${typeBadge}
             <span class="badge-code">${item.code}</span>
+            <span class="badge-category" style="background:${catColor}; color:white; font-size:10px; font-weight:800; padding:2px 6px; border-radius:4px; position:absolute; bottom:6px; left:6px;">${catName}</span>
           </div>
           <div class="media-item-info">
             <h4>${item.title}</h4>
@@ -155,8 +166,11 @@
           </div>
           <div class="media-item-actions">
             <button class="btn btn-secondary btn-xs" onclick="BipinhoAdmin.quickBip('${item.code}')" title="Testar exibição na TV">
-              📡 Bipar na TV
+              📡 Bipar
             </button>
+            <a href="/admin/colorir/${item.id}" target="_blank" class="btn btn-outline btn-xs" title="Imprimir versão em contorno para colorir">
+              🖍️ Colorir
+            </a>
             <button class="btn btn-outline btn-xs" onclick="BipinhoAdmin.viewBarcode('${item.code}', '${escapeHtml(item.title)}')">
               🏷️ Código
             </button>
@@ -228,6 +242,8 @@
     document.getElementById("edit-author").value = item.author;
     document.getElementById("edit-date").value = item.date;
     document.getElementById("edit-code").value = item.code;
+    const catSelect = document.getElementById("edit-category");
+    if (catSelect) catSelect.value = item.category || "Geral";
     document.getElementById("edit-file").value = "";
 
     document.getElementById("modal-edit").classList.add("active");
@@ -248,6 +264,8 @@
     formData.append("author", document.getElementById("edit-author").value);
     formData.append("date", document.getElementById("edit-date").value);
     formData.append("code", document.getElementById("edit-code").value);
+    const catSelect = document.getElementById("edit-category");
+    if (catSelect) formData.append("category", catSelect.value);
 
     const fileInput = document.getElementById("edit-file");
     if (fileInput.files.length > 0) {

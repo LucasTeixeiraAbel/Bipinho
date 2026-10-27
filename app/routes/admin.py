@@ -13,7 +13,7 @@ from pydantic import BaseModel
 
 from app.config import (
     TEMPLATES_DIR, DEFAULT_PORT, get_lan_ip,
-    READER_TIPS, UPLOADS_DIR, THUMBS_DIR
+    READER_TIPS, UPLOADS_DIR, THUMBS_DIR, OUTLINES_DIR
 )
 from app.database import (
     get_all_items, get_item_by_id, get_item_by_code,
@@ -22,6 +22,7 @@ from app.database import (
     get_stats, reset_session,
     get_weekly_history, get_history_by_date,
     get_all_challenges, set_challenges,
+    get_all_categories, get_category_color_map,
 )
 from app.services.auth_service import hash_password, verify_password
 from app.services.rate_limiter import check_ip_lockout, record_login_failure, record_login_success
@@ -30,6 +31,8 @@ from app.services.media_service import save_and_process_media, is_ffmpeg_install
 from app.services.session_manager import handle_barcode_scan, broadcast_event, get_current_session_info
 from app.services.backup_service import create_backup_zip, validate_backup_zip, restore_backup_zip
 from app.services.schedule_service import check_schedule_allowed
+from app.services.outline_service import generate_coloring_outline
+from app.services.barcode_service import generate_code128_svg
 
 router = APIRouter()
 
@@ -223,6 +226,59 @@ async def api_admin_info(request: Request):
         "admin_access_restriction": settings.get("admin_access_restriction", "all")
     }
 
+@router.get("/api/admin/categories")
+async def api_get_categories(request: Request):
+    require_auth(request)
+    return get_all_categories()
+
+@router.get("/admin/colorir/{item_id}", response_class=HTMLResponse)
+async def print_coloring_page(item_id: int, request: Request):
+    check_ip_restriction(request)
+    if not is_authenticated(request):
+        return RedirectResponse(url="/admin/login", status_code=303)
+
+    item = get_item_by_id(item_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Desenho não encontrado")
+
+    # Determine source image for outline
+    if item["media_type"] == "image":
+        src_path = UPLOADS_DIR / item["filename"]
+    else:
+        src_path = THUMBS_DIR / item["thumb_filename"]
+
+    outline_filename = f"outline_{item_id}.png"
+    outline_path = OUTLINES_DIR / outline_filename
+
+    # Generate if not exists
+    if not outline_path.exists():
+        ok = generate_coloring_outline(src_path, outline_path)
+        if not ok:
+            # Fallback to source thumbnail if outline generation failed
+            outline_filename = item["thumb_filename"]
+
+    # Category color
+    color_map = get_category_color_map()
+    cat_color = color_map.get(item.get("category", "Geral"), "#3b82f6")
+
+    # Barcode SVG
+    barcode_svg = generate_code128_svg(item["code"], write_text=False)
+
+    template_text = (TEMPLATES_DIR / "coloring_page.html").read_text(encoding="utf-8")
+    rendered = (
+        template_text
+        .replace("{{ item.title }}", item["title"])
+        .replace("{{ item.author }}", item["author"])
+        .replace("{{ item.date }}", item["date"])
+        .replace("{{ item.code }}", item["code"])
+        .replace("{{ item.category or 'Geral' }}", item.get("category") or "Geral")
+        .replace("{{ category_color }}", cat_color)
+        .replace("{{ outline_url }}", f"/media/outlines/{outline_filename}")
+        .replace("{{ barcode_svg | safe }}", barcode_svg)
+    )
+
+    return HTMLResponse(content=rendered)
+
 @router.get("/api/admin/items")
 async def api_get_items(request: Request):
     require_auth(request)
@@ -235,6 +291,7 @@ async def api_create_item(
     author: str = Form(...),
     date: str = Form(...),
     code: Optional[str] = Form(None),
+    category: Optional[str] = Form("Geral"),
     file: UploadFile = File(...)
 ):
     require_auth(request)
@@ -278,14 +335,23 @@ async def api_create_item(
         date=date,
         media_type=media_type,
         filename=safe_name,
-        thumb_filename=thumb_name
+        thumb_filename=thumb_name,
+        category=category or "Geral"
     )
+
+    # Automatically pre-generate coloring outline
+    try:
+        src_for_outline = (UPLOADS_DIR / safe_name) if media_type == "image" else (THUMBS_DIR / thumb_name)
+        generate_coloring_outline(src_for_outline, OUTLINES_DIR / f"outline_{item_id}.png")
+    except Exception:
+        pass
 
     return {
         "status": "success",
         "item_id": item_id,
         "code": final_code,
         "media_type": media_type,
+        "category": category or "Geral",
         "warning": warning
     }
 
@@ -297,6 +363,7 @@ async def api_update_item(
     author: str = Form(...),
     date: str = Form(...),
     code: str = Form(...),
+    category: Optional[str] = Form("Geral"),
     file: Optional[UploadFile] = File(None)
 ):
     require_auth(request)
@@ -322,6 +389,12 @@ async def api_update_item(
                 original_filename=file.filename,
                 title=title
             )
+            # Re-generate coloring outline on file change
+            try:
+                src_for_outline = (UPLOADS_DIR / new_filename) if media_type == "image" else (THUMBS_DIR / new_thumb)
+                generate_coloring_outline(src_for_outline, OUTLINES_DIR / f"outline_{item_id}.png")
+            except Exception:
+                pass
 
     update_item(
         item_id=item_id,
@@ -330,7 +403,8 @@ async def api_update_item(
         author=author,
         date=date,
         filename=new_filename,
-        thumb_filename=new_thumb
+        thumb_filename=new_thumb,
+        category=category or "Geral"
     )
 
     return {"status": "success", "warning": warning}

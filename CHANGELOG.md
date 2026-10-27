@@ -5,6 +5,41 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ---
 
+## [1.4.0] — 2026-10-27
+
+### Etapa 4 — Experiência da Criança
+
+#### Adicionado
+- **Categorias com Cores Próprias** (`app/database.py`):
+  - Tabela `categories` com 5 categorias padrão: *Animais* (`#10b981`), *Músicas* (`#f59e0b`), *Histórias* (`#3b82f6`), *Educativos* (`#8b5cf6`) e *Geral* (`#64748b`).
+  - Cada desenho agora possui sua categoria, exibida com crachá colorido no painel de administração e com faixa no topo dos cartões impressos.
+  - Endpoint `GET /api/admin/categories` e suporte nos formulários de cadastro e edição de desenhos.
+- **Cartões de Contorno para Colorir (P&B)** (`app/services/outline_service.py`):
+  - Algoritmo de processamento de imagem com detecção de bordas (Sobel / `FIND_EDGES` via Pillow) que transforma imagens e miniaturas de vídeos em desenhos limpos de linhas em preto e branco.
+  - Rota `/admin/colorir/{item_id}` com folha A4 pronta para impressão em preto e branco, contendo o desenho para colorir, título, código de barras Code128 e instruções lúdicas para a criança bipar na TV após pintar.
+  - Botão de acesso rápido `🖍️ Colorir` em cada cartão de desenho no painel administrativo.
+- **Modos de Impressão Flexíveis e Caça ao Tesouro** (`app/templates/print_cards.html`):
+  - Seletor de tamanho na folha A4:
+    - *Padrão (6 por folha)*: Para montar a pastinha tradicional de cartões.
+    - *Grandes (2 por folha)*: Cartões maiores para mãos pequenas e maior visibilidade.
+    - *Caça ao Tesouro (1 por folha)*: Cartão gigante com borda temática especial para os pais esconderem pela casa e a criança procurar para bipar.
+  - Opção *Agrupar por Categoria* para ordenar os cartões na folha por categoria.
+  - Faixa colorida da categoria no topo de cada cartão impresso.
+- **Mascote Bipinho Animado na Tela de Espera** (`app/templates/child.html`, `static/css/child.css`):
+  - Mascote leitorzinho em SVG e CSS puro (sem dependências ou imagens pesadas):
+    - Olhinhos que piscam suavemente a cada 4 segundos (`@keyframes mascotBlink`).
+    - Bracinho que acena suavemente (`@keyframes mascotWave`).
+    - Linha de laser vermelho sutil pulsando no visor.
+    - Reação comemorativa ao receber um bipe válido: pulo de alegria (`mascotCheerJump`), aceno rápido e efeito sonoro alegre.
+  - Respeita a configuração de som da administração e a opção de desativar o mascote (`mascot_enabled`).
+- **Interface 10-foot UI pura**:
+  - Zero botões clicáveis na tela da criança, foco automático constante no leitor e fontes legíveis de longe na TV.
+
+#### Testes novos
+- `tests/test_etapa4.py` — 7 testes cobrindo categorias no banco e API, CRUD de itens com categoria, gerador de contorno P&B para colorir, rota da folha de colorir, recursos da folha de impressão (tamanhos 1/2/6 e agrupamento), mascote animado e desafios de movimento na pausa.
+
+---
+
 ## [1.3.0] — 2026-10-27
 
 ### Etapa 3 — Controle dos Pais
@@ -46,6 +81,41 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 #### Testes novos
 - `tests/test_etapa3.py` — 10 testes cobrindo: agenda desativada, bloqueio manual da TV, restrição de horário, restrição de dias da semana, tela de bloqueio e desbloqueio excepcional pela chave dos pais, 15 desafios padrão e API, APIs do painel ao vivo, rastreamento de histórico diário/semanal, importação em lote e separação da chave dos pais na folha de impressão.
+
+---
+
+## [1.4.0] — 2026-10-27
+
+### Etapa 4 — Experiência da Criança
+
+#### Adicionado
+- **Categorias com Cores Próprias** (`app/database.py`):
+  - Tabela `categories` com 5 categorias padrão: *Animais* (`#10b981`), *Músicas* (`#f59e0b`), *Histórias* (`#3b82f6`), *Educativos* (`#8b5cf6`) e *Geral* (`#64748b`).
+  - Cada desenho agora possui sua categoria, exibida com crachá colorido no painel de administração e com faixa no topo dos cartões impressos.
+  - Endpoint `GET /api/admin/categories` e suporte nos formulários de cadastro e edição de desenhos.
+- **Cartões de Contorno para Colorir (P&B)** (`app/services/outline_service.py`):
+  - Algoritmo de processamento de imagem com detecção de bordas (Sobel / `FIND_EDGES` via Pillow) que transforma imagens e miniaturas de vídeos em desenhos limpos de linhas em preto e branco.
+  - Rota `/admin/colorir/{item_id}` com folha A4 pronta para impressão em preto e branco, contendo o desenho para colorir, título, código de barras Code128 e instruções lúdicas para a criança bipar na TV após pintar.
+  - Botão de acesso rápido `🖍️ Colorir` em cada cartão de desenho no painel administrativo.
+- **Modos de Impressão Flexíveis e Caça ao Tesouro** (`app/templates/print_cards.html`):
+  - Seletor de tamanho na folha A4:
+    - *Padrão (6 por folha)*: Para montar a pastinha tradicional de cartões.
+    - *Grandes (2 por folha)*: Cartões maiores para mãos pequenas e maior visibilidade.
+    - *Caça ao Tesouro (1 por folha)*: Cartão gigante com borda temática especial para os pais esconderem pela casa e a criança procurar para bipar.
+  - Opção *Agrupar por Categoria* para ordenar os cartões na folha por categoria.
+  - Faixa colorida da categoria no topo de cada cartão impresso.
+- **Mascote Bipinho Animado na Tela de Espera** (`app/templates/child.html`, `static/css/child.css`):
+  - Mascote leitorzinho em SVG e CSS puro (sem dependências ou imagens pesadas):
+    - Olhinhos que piscam suavemente a cada 4 segundos (`@keyframes mascotBlink`).
+    - Bracinho que acena suavemente (`@keyframes mascotWave`).
+    - Linha de laser vermelho sutil pulsando no visor.
+    - Reação comemorativa ao receber um bipe válido: pulo de alegria (`mascotCheerJump`), aceno rápido e efeito sonoro alegre.
+  - Respeita a configuração de som da administração e a opção de desativar o mascote (`mascot_enabled`).
+- **Interface 10-foot UI pura**:
+  - Zero botões clicáveis na tela da criança, foco automático constante no leitor e fontes legíveis de longe na TV.
+
+#### Testes novos
+- `tests/test_etapa4.py` — 7 testes cobrindo categorias no banco e API, CRUD de itens com categoria, gerador de contorno P&B para colorir, rota da folha de colorir, recursos da folha de impressão (tamanhos 1/2/6 e agrupamento), mascote animado e desafios de movimento na pausa.
 
 ---
 
@@ -67,6 +137,41 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ---
 
+## [1.4.0] — 2026-10-27
+
+### Etapa 4 — Experiência da Criança
+
+#### Adicionado
+- **Categorias com Cores Próprias** (`app/database.py`):
+  - Tabela `categories` com 5 categorias padrão: *Animais* (`#10b981`), *Músicas* (`#f59e0b`), *Histórias* (`#3b82f6`), *Educativos* (`#8b5cf6`) e *Geral* (`#64748b`).
+  - Cada desenho agora possui sua categoria, exibida com crachá colorido no painel de administração e com faixa no topo dos cartões impressos.
+  - Endpoint `GET /api/admin/categories` e suporte nos formulários de cadastro e edição de desenhos.
+- **Cartões de Contorno para Colorir (P&B)** (`app/services/outline_service.py`):
+  - Algoritmo de processamento de imagem com detecção de bordas (Sobel / `FIND_EDGES` via Pillow) que transforma imagens e miniaturas de vídeos em desenhos limpos de linhas em preto e branco.
+  - Rota `/admin/colorir/{item_id}` com folha A4 pronta para impressão em preto e branco, contendo o desenho para colorir, título, código de barras Code128 e instruções lúdicas para a criança bipar na TV após pintar.
+  - Botão de acesso rápido `🖍️ Colorir` em cada cartão de desenho no painel administrativo.
+- **Modos de Impressão Flexíveis e Caça ao Tesouro** (`app/templates/print_cards.html`):
+  - Seletor de tamanho na folha A4:
+    - *Padrão (6 por folha)*: Para montar a pastinha tradicional de cartões.
+    - *Grandes (2 por folha)*: Cartões maiores para mãos pequenas e maior visibilidade.
+    - *Caça ao Tesouro (1 por folha)*: Cartão gigante com borda temática especial para os pais esconderem pela casa e a criança procurar para bipar.
+  - Opção *Agrupar por Categoria* para ordenar os cartões na folha por categoria.
+  - Faixa colorida da categoria no topo de cada cartão impresso.
+- **Mascote Bipinho Animado na Tela de Espera** (`app/templates/child.html`, `static/css/child.css`):
+  - Mascote leitorzinho em SVG e CSS puro (sem dependências ou imagens pesadas):
+    - Olhinhos que piscam suavemente a cada 4 segundos (`@keyframes mascotBlink`).
+    - Bracinho que acena suavemente (`@keyframes mascotWave`).
+    - Linha de laser vermelho sutil pulsando no visor.
+    - Reação comemorativa ao receber um bipe válido: pulo de alegria (`mascotCheerJump`), aceno rápido e efeito sonoro alegre.
+  - Respeita a configuração de som da administração e a opção de desativar o mascote (`mascot_enabled`).
+- **Interface 10-foot UI pura**:
+  - Zero botões clicáveis na tela da criança, foco automático constante no leitor e fontes legíveis de longe na TV.
+
+#### Testes novos
+- `tests/test_etapa4.py` — 7 testes cobrindo categorias no banco e API, CRUD de itens com categoria, gerador de contorno P&B para colorir, rota da folha de colorir, recursos da folha de impressão (tamanhos 1/2/6 e agrupamento), mascote animado e desafios de movimento na pausa.
+
+---
+
 ## [1.3.0] — 2026-10-27
 
 ### Etapa 3 — Controle dos Pais
@@ -108,6 +213,41 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 #### Testes novos
 - `tests/test_etapa3.py` — 10 testes cobrindo: agenda desativada, bloqueio manual da TV, restrição de horário, restrição de dias da semana, tela de bloqueio e desbloqueio excepcional pela chave dos pais, 15 desafios padrão e API, APIs do painel ao vivo, rastreamento de histórico diário/semanal, importação em lote e separação da chave dos pais na folha de impressão.
+
+---
+
+## [1.4.0] — 2026-10-27
+
+### Etapa 4 — Experiência da Criança
+
+#### Adicionado
+- **Categorias com Cores Próprias** (`app/database.py`):
+  - Tabela `categories` com 5 categorias padrão: *Animais* (`#10b981`), *Músicas* (`#f59e0b`), *Histórias* (`#3b82f6`), *Educativos* (`#8b5cf6`) e *Geral* (`#64748b`).
+  - Cada desenho agora possui sua categoria, exibida com crachá colorido no painel de administração e com faixa no topo dos cartões impressos.
+  - Endpoint `GET /api/admin/categories` e suporte nos formulários de cadastro e edição de desenhos.
+- **Cartões de Contorno para Colorir (P&B)** (`app/services/outline_service.py`):
+  - Algoritmo de processamento de imagem com detecção de bordas (Sobel / `FIND_EDGES` via Pillow) que transforma imagens e miniaturas de vídeos em desenhos limpos de linhas em preto e branco.
+  - Rota `/admin/colorir/{item_id}` com folha A4 pronta para impressão em preto e branco, contendo o desenho para colorir, título, código de barras Code128 e instruções lúdicas para a criança bipar na TV após pintar.
+  - Botão de acesso rápido `🖍️ Colorir` em cada cartão de desenho no painel administrativo.
+- **Modos de Impressão Flexíveis e Caça ao Tesouro** (`app/templates/print_cards.html`):
+  - Seletor de tamanho na folha A4:
+    - *Padrão (6 por folha)*: Para montar a pastinha tradicional de cartões.
+    - *Grandes (2 por folha)*: Cartões maiores para mãos pequenas e maior visibilidade.
+    - *Caça ao Tesouro (1 por folha)*: Cartão gigante com borda temática especial para os pais esconderem pela casa e a criança procurar para bipar.
+  - Opção *Agrupar por Categoria* para ordenar os cartões na folha por categoria.
+  - Faixa colorida da categoria no topo de cada cartão impresso.
+- **Mascote Bipinho Animado na Tela de Espera** (`app/templates/child.html`, `static/css/child.css`):
+  - Mascote leitorzinho em SVG e CSS puro (sem dependências ou imagens pesadas):
+    - Olhinhos que piscam suavemente a cada 4 segundos (`@keyframes mascotBlink`).
+    - Bracinho que acena suavemente (`@keyframes mascotWave`).
+    - Linha de laser vermelho sutil pulsando no visor.
+    - Reação comemorativa ao receber um bipe válido: pulo de alegria (`mascotCheerJump`), aceno rápido e efeito sonoro alegre.
+  - Respeita a configuração de som da administração e a opção de desativar o mascote (`mascot_enabled`).
+- **Interface 10-foot UI pura**:
+  - Zero botões clicáveis na tela da criança, foco automático constante no leitor e fontes legíveis de longe na TV.
+
+#### Testes novos
+- `tests/test_etapa4.py` — 7 testes cobrindo categorias no banco e API, CRUD de itens com categoria, gerador de contorno P&B para colorir, rota da folha de colorir, recursos da folha de impressão (tamanhos 1/2/6 e agrupamento), mascote animado e desafios de movimento na pausa.
 
 ---
 
@@ -141,6 +281,41 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ---
 
+## [1.4.0] — 2026-10-27
+
+### Etapa 4 — Experiência da Criança
+
+#### Adicionado
+- **Categorias com Cores Próprias** (`app/database.py`):
+  - Tabela `categories` com 5 categorias padrão: *Animais* (`#10b981`), *Músicas* (`#f59e0b`), *Histórias* (`#3b82f6`), *Educativos* (`#8b5cf6`) e *Geral* (`#64748b`).
+  - Cada desenho agora possui sua categoria, exibida com crachá colorido no painel de administração e com faixa no topo dos cartões impressos.
+  - Endpoint `GET /api/admin/categories` e suporte nos formulários de cadastro e edição de desenhos.
+- **Cartões de Contorno para Colorir (P&B)** (`app/services/outline_service.py`):
+  - Algoritmo de processamento de imagem com detecção de bordas (Sobel / `FIND_EDGES` via Pillow) que transforma imagens e miniaturas de vídeos em desenhos limpos de linhas em preto e branco.
+  - Rota `/admin/colorir/{item_id}` com folha A4 pronta para impressão em preto e branco, contendo o desenho para colorir, título, código de barras Code128 e instruções lúdicas para a criança bipar na TV após pintar.
+  - Botão de acesso rápido `🖍️ Colorir` em cada cartão de desenho no painel administrativo.
+- **Modos de Impressão Flexíveis e Caça ao Tesouro** (`app/templates/print_cards.html`):
+  - Seletor de tamanho na folha A4:
+    - *Padrão (6 por folha)*: Para montar a pastinha tradicional de cartões.
+    - *Grandes (2 por folha)*: Cartões maiores para mãos pequenas e maior visibilidade.
+    - *Caça ao Tesouro (1 por folha)*: Cartão gigante com borda temática especial para os pais esconderem pela casa e a criança procurar para bipar.
+  - Opção *Agrupar por Categoria* para ordenar os cartões na folha por categoria.
+  - Faixa colorida da categoria no topo de cada cartão impresso.
+- **Mascote Bipinho Animado na Tela de Espera** (`app/templates/child.html`, `static/css/child.css`):
+  - Mascote leitorzinho em SVG e CSS puro (sem dependências ou imagens pesadas):
+    - Olhinhos que piscam suavemente a cada 4 segundos (`@keyframes mascotBlink`).
+    - Bracinho que acena suavemente (`@keyframes mascotWave`).
+    - Linha de laser vermelho sutil pulsando no visor.
+    - Reação comemorativa ao receber um bipe válido: pulo de alegria (`mascotCheerJump`), aceno rápido e efeito sonoro alegre.
+  - Respeita a configuração de som da administração e a opção de desativar o mascote (`mascot_enabled`).
+- **Interface 10-foot UI pura**:
+  - Zero botões clicáveis na tela da criança, foco automático constante no leitor e fontes legíveis de longe na TV.
+
+#### Testes novos
+- `tests/test_etapa4.py` — 7 testes cobrindo categorias no banco e API, CRUD de itens com categoria, gerador de contorno P&B para colorir, rota da folha de colorir, recursos da folha de impressão (tamanhos 1/2/6 e agrupamento), mascote animado e desafios de movimento na pausa.
+
+---
+
 ## [1.3.0] — 2026-10-27
 
 ### Etapa 3 — Controle dos Pais
@@ -182,6 +357,41 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 #### Testes novos
 - `tests/test_etapa3.py` — 10 testes cobrindo: agenda desativada, bloqueio manual da TV, restrição de horário, restrição de dias da semana, tela de bloqueio e desbloqueio excepcional pela chave dos pais, 15 desafios padrão e API, APIs do painel ao vivo, rastreamento de histórico diário/semanal, importação em lote e separação da chave dos pais na folha de impressão.
+
+---
+
+## [1.4.0] — 2026-10-27
+
+### Etapa 4 — Experiência da Criança
+
+#### Adicionado
+- **Categorias com Cores Próprias** (`app/database.py`):
+  - Tabela `categories` com 5 categorias padrão: *Animais* (`#10b981`), *Músicas* (`#f59e0b`), *Histórias* (`#3b82f6`), *Educativos* (`#8b5cf6`) e *Geral* (`#64748b`).
+  - Cada desenho agora possui sua categoria, exibida com crachá colorido no painel de administração e com faixa no topo dos cartões impressos.
+  - Endpoint `GET /api/admin/categories` e suporte nos formulários de cadastro e edição de desenhos.
+- **Cartões de Contorno para Colorir (P&B)** (`app/services/outline_service.py`):
+  - Algoritmo de processamento de imagem com detecção de bordas (Sobel / `FIND_EDGES` via Pillow) que transforma imagens e miniaturas de vídeos em desenhos limpos de linhas em preto e branco.
+  - Rota `/admin/colorir/{item_id}` com folha A4 pronta para impressão em preto e branco, contendo o desenho para colorir, título, código de barras Code128 e instruções lúdicas para a criança bipar na TV após pintar.
+  - Botão de acesso rápido `🖍️ Colorir` em cada cartão de desenho no painel administrativo.
+- **Modos de Impressão Flexíveis e Caça ao Tesouro** (`app/templates/print_cards.html`):
+  - Seletor de tamanho na folha A4:
+    - *Padrão (6 por folha)*: Para montar a pastinha tradicional de cartões.
+    - *Grandes (2 por folha)*: Cartões maiores para mãos pequenas e maior visibilidade.
+    - *Caça ao Tesouro (1 por folha)*: Cartão gigante com borda temática especial para os pais esconderem pela casa e a criança procurar para bipar.
+  - Opção *Agrupar por Categoria* para ordenar os cartões na folha por categoria.
+  - Faixa colorida da categoria no topo de cada cartão impresso.
+- **Mascote Bipinho Animado na Tela de Espera** (`app/templates/child.html`, `static/css/child.css`):
+  - Mascote leitorzinho em SVG e CSS puro (sem dependências ou imagens pesadas):
+    - Olhinhos que piscam suavemente a cada 4 segundos (`@keyframes mascotBlink`).
+    - Bracinho que acena suavemente (`@keyframes mascotWave`).
+    - Linha de laser vermelho sutil pulsando no visor.
+    - Reação comemorativa ao receber um bipe válido: pulo de alegria (`mascotCheerJump`), aceno rápido e efeito sonoro alegre.
+  - Respeita a configuração de som da administração e a opção de desativar o mascote (`mascot_enabled`).
+- **Interface 10-foot UI pura**:
+  - Zero botões clicáveis na tela da criança, foco automático constante no leitor e fontes legíveis de longe na TV.
+
+#### Testes novos
+- `tests/test_etapa4.py` — 7 testes cobrindo categorias no banco e API, CRUD de itens com categoria, gerador de contorno P&B para colorir, rota da folha de colorir, recursos da folha de impressão (tamanhos 1/2/6 e agrupamento), mascote animado e desafios de movimento na pausa.
 
 ---
 

@@ -245,7 +245,33 @@ O Bipinho oferece ferramentas completas para os pais gerenciarem e acompanharem 
 
 ---
 
-## 🛡️ 9. Segurança & Confiabilidade na TV
+## 🎨 9. Experiência da Criança & Atividades Lúdicas (Etapa 4)
+
+O Bipinho foi desenhado com foco no encantamento e na saúde visual da criança:
+
+- **Mascote Animado Bipinho (SVG Puro):**
+  - Um leitorzinho simpático com olhinhos que piscam a cada 4 segundos e bracinho que acena suavemente na tela de espera.
+  - Ao receber um bipe válido, o mascote pula de alegria, comemora com acenos rápidos e toca um efeito sonoro alegre.
+  - Totalmente em código vetorial SVG e CSS puro (leve, sem imagens pesadas e sem bibliotecas externas).
+  - Pode ser desativado nas configurações caso os pais prefiram uma tela minimalista.
+- **Categorias com Cores Próprias:**
+  - Cada desenho é organizado em categorias (Animais, Músicas, Histórias, Educativos ou Geral) com cores vibrantes específicas.
+  - Na administração, cada cartão exibe sua etiqueta colorida; nos cartões impressos, uma faixa colorida destaca o tema.
+- **Cartão de Contorno para Colorir (Linhas P&B):**
+  - Qualquer desenho cadastrado pode ser convertido em uma folha de colorir com um clique no botão **"🖍️ Colorir"** na administração (`/admin/colorir/{id}`).
+  - O sistema usa processamento de imagem com detecção de bordas via Pillow para extrair linhas nítidas em preto e branco sobre fundo branco puro, prontas para lápis de cor ou giz de cera.
+  - A folha A4 inclui o código de barras para a criança bipar na TV logo após terminar a pintura!
+- **Modos de Impressão Flexíveis e Caça ao Tesouro:**
+  - **Padrão (6 por folha):** Formato clássico para recortar e colar na pastinha de plástico.
+  - **Grandes (2 por folha):** Cartões médios com imagens maiores.
+  - **Caça ao Tesouro (1 por folha):** Cartão gigante com borda especial para os pais espalharem pela casa e a criança procurar com o leitor óptico.
+  - **Opção de Agrupar por Categoria:** Ordena e organiza os cartões automaticamente antes da impressão.
+- **Interface 10-foot UI pura:**
+  - Fontes grandes e legíveis a 3 metros de distância do sofá, cores de alto contraste e **nenhum botão ou elemento clicável** na tela da criança.
+
+---
+
+## 🛡️ 10. Segurança & Confiabilidade na TV
 
 - **Screen Wake Lock & Fallback:** Impede a TV de apagar a tela durante o uso com fallback de vídeo mudo para Android TVs antigas.
 - **Reconexão Automática com Overlay Amigável:** Quando a conexão SSE cai ou o servidor reinicia, a TV exibe *"Bipinho já volta!"* e reconecta sozinha mantendo as estrelas.
@@ -256,7 +282,7 @@ O Bipinho oferece ferramentas completas para os pais gerenciarem e acompanharem 
 
 ---
 
-## 🧪 10. Testes Automatizados
+## 🧪 11. Testes Automatizados
 
 Execute os testes no terminal dentro da pasta do projeto:
 
@@ -267,11 +293,14 @@ python -m tests.test_etapa1
 # Testes de Confiabilidade na TV & Backup (Etapa 2 - 9 testes)
 python -m tests.test_etapa2
 
-# Testes de Controle dos Pais, Agenda, Histórico e Importação (Etapa 3 - 10 testes)
+# Testes de Controle dos Pais, Agenda e Histórico (Etapa 3 - 10 testes)
 python -m tests.test_etapa3
+
+# Testes de Experiência da Criança, Categorias e Colorir (Etapa 4 - 7 testes)
+python -m tests.test_etapa4
 
 # Teste de Fluxo Completo Original (15 testes)
 python -m tests.test_bipinho
 ```
 
-Todas as 4 suítes (totalizando **40 testes**) passam com 100% de sucesso!
+Todas as 5 suítes (totalizando **47 testes**) passam com 100% de sucesso!

@@ -50,7 +50,8 @@
     total_pause_seconds: 1080,
     pause_minutes: 18,
     sound_enabled: true,
-    title_display_seconds: 30
+    title_display_seconds: 30,
+    mascot_enabled: true
   };
 
   let activeItem = null;
@@ -299,6 +300,25 @@
     }
   });
 
+  // ----------------- MASCOT ANIMATION & CELEBRATION ----------------- //
+
+  function updateMascotVisibility(enabled) {
+    const container = document.getElementById("mascot-container");
+    if (!container) return;
+    container.style.display = (enabled === false) ? "none" : "";
+  }
+
+  function triggerMascotCheer() {
+    const container = document.getElementById("mascot-container");
+    if (!container || container.style.display === "none") return;
+    container.classList.remove("scan-cheer");
+    void container.offsetWidth; // trigger reflow
+    container.classList.add("scan-cheer");
+    setTimeout(() => {
+      container.classList.remove("scan-cheer");
+    }, 900);
+  }
+
   // ----------------- SCAN RESPONSE DISPATCHER ----------------- //
 
   function handleScanResponse(data) {
@@ -306,6 +326,7 @@
 
     if (data.status === "success") {
       hideSleepingScreen();
+      triggerMascotCheer();
       if (data.is_surprise) {
         playSound("surprise");
       } else {
@@ -596,6 +617,8 @@
         sessionState.max_scans = s.max_scans;
         sessionState.sound_enabled = s.sound_enabled;
         sessionState.title_display_seconds = s.title_display_seconds;
+        sessionState.mascot_enabled = s.mascot_enabled !== false;
+        updateMascotVisibility(sessionState.mascot_enabled);
         updateStarsUI();
 
         if (s.is_paused) {
@@ -719,6 +742,10 @@
           if (msg.data.max_scans !== undefined) {
             sessionState.max_scans = parseInt(msg.data.max_scans, 10);
             updateStarsUI();
+          }
+          if (msg.data.mascot_enabled !== undefined) {
+            sessionState.mascot_enabled = msg.data.mascot_enabled === "1";
+            updateMascotVisibility(sessionState.mascot_enabled);
           }
           checkScheduleStatus();
         } else if (msg.type === "session_reset") {

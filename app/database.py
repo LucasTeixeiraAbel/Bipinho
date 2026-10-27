@@ -131,6 +131,38 @@ def init_db():
             )
         """)
 
+        # Categories table
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS categories (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT UNIQUE NOT NULL,
+                color TEXT NOT NULL,
+                icon TEXT DEFAULT '🎬',
+                sort_order INTEGER DEFAULT 0
+            )
+        """)
+
+        # Migration: Ensure category exists in items table
+        item_cols = [r[1] for r in conn.execute("PRAGMA table_info(items)").fetchall()]
+        if "category" not in item_cols:
+            conn.execute("ALTER TABLE items ADD COLUMN category TEXT DEFAULT 'Geral'")
+
+        # Seed default categories if table is empty
+        cat_count = conn.execute("SELECT COUNT(*) FROM categories").fetchone()[0]
+        if cat_count == 0:
+            default_categories = [
+                ("Animais", "#10b981", "🐾", 0),
+                ("Músicas", "#f59e0b", "🎵", 1),
+                ("Histórias", "#3b82f6", "📖", 2),
+                ("Educativos", "#8b5cf6", "🎨", 3),
+                ("Geral", "#64748b", "🎬", 4),
+            ]
+            for name, color, icon, s_order in default_categories:
+                conn.execute(
+                    "INSERT OR IGNORE INTO categories (name, color, icon, sort_order) VALUES (?, ?, ?, ?)",
+                    (name, color, icon, s_order)
+                )
+
         # Seed default movement challenges if table is empty
         count = conn.execute("SELECT COUNT(*) FROM movement_challenges").fetchone()[0]
         if count == 0:
@@ -215,14 +247,24 @@ def create_item(
     date: str,
     media_type: str,
     filename: str,
-    thumb_filename: str
+    thumb_filename: str,
+    category: str = "Geral"
 ) -> int:
     conn = get_connection()
     with conn:
         cursor = conn.execute("""
-            INSERT INTO items (code, title, author, date, media_type, filename, thumb_filename)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, (code.strip().upper(), title.strip(), author.strip(), date.strip(), media_type, filename, thumb_filename))
+            INSERT INTO items (code, title, author, date, media_type, filename, thumb_filename, category)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            code.strip().upper(),
+            title.strip(),
+            author.strip(),
+            date.strip(),
+            media_type,
+            filename,
+            thumb_filename,
+            category.strip() if category else "Geral"
+        ))
         new_id = cursor.lastrowid
     conn.close()
     return new_id
@@ -234,24 +276,57 @@ def update_item(
     author: str,
     date: str,
     filename: Optional[str] = None,
-    thumb_filename: Optional[str] = None
+    thumb_filename: Optional[str] = None,
+    category: Optional[str] = None
 ) -> bool:
     conn = get_connection()
+    cat_val = category.strip() if category else None
     with conn:
         if filename and thumb_filename:
-            conn.execute("""
-                UPDATE items
-                SET code = ?, title = ?, author = ?, date = ?, filename = ?, thumb_filename = ?
-                WHERE id = ?
-            """, (code.strip().upper(), title.strip(), author.strip(), date.strip(), filename, thumb_filename, item_id))
+            if cat_val is not None:
+                conn.execute("""
+                    UPDATE items
+                    SET code = ?, title = ?, author = ?, date = ?, filename = ?, thumb_filename = ?, category = ?
+                    WHERE id = ?
+                """, (code.strip().upper(), title.strip(), author.strip(), date.strip(), filename, thumb_filename, cat_val, item_id))
+            else:
+                conn.execute("""
+                    UPDATE items
+                    SET code = ?, title = ?, author = ?, date = ?, filename = ?, thumb_filename = ?
+                    WHERE id = ?
+                """, (code.strip().upper(), title.strip(), author.strip(), date.strip(), filename, thumb_filename, item_id))
         else:
-            conn.execute("""
-                UPDATE items
-                SET code = ?, title = ?, author = ?, date = ?
-                WHERE id = ?
-            """, (code.strip().upper(), title.strip(), author.strip(), date.strip(), item_id))
+            if cat_val is not None:
+                conn.execute("""
+                    UPDATE items
+                    SET code = ?, title = ?, author = ?, date = ?, category = ?
+                    WHERE id = ?
+                """, (code.strip().upper(), title.strip(), author.strip(), date.strip(), cat_val, item_id))
+            else:
+                conn.execute("""
+                    UPDATE items
+                    SET code = ?, title = ?, author = ?, date = ?
+                    WHERE id = ?
+                """, (code.strip().upper(), title.strip(), author.strip(), date.strip(), item_id))
     conn.close()
     return True
+
+# ----------------- CATEGORIES ----------------- #
+
+def get_all_categories() -> List[Dict[str, Any]]:
+    conn = get_connection()
+    cursor = conn.execute("SELECT * FROM categories ORDER BY sort_order, name")
+    rows = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+    return rows
+
+def get_category_color_map() -> Dict[str, str]:
+    """Returns mapping from category name to hex color."""
+    cats = get_all_categories()
+    mapping = {c["name"]: c["color"] for c in cats}
+    if "Geral" not in mapping:
+        mapping["Geral"] = "#64748b"
+    return mapping
 
 def delete_item(item_id: int) -> Optional[Dict[str, Any]]:
     item = get_item_by_id(item_id)
