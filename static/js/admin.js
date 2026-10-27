@@ -30,6 +30,7 @@
       document.getElementById(target).classList.add("active");
 
       if (target === "tab-stats") loadStats();
+      if (target === "tab-diagnostics") loadDiagnostics();
       if (target === "tab-tester") {
         setTimeout(() => document.getElementById("tester-input").focus(), 100);
       }
@@ -319,6 +320,9 @@
         document.getElementById("cfg-parent-code").value = cfg.parent_unlock_code || "PAIS-LIBERAR-99";
         document.getElementById("cfg-surprise-code").value = cfg.surprise_code || "BIP-SURPRESA";
         document.getElementById("cfg-surprise-toggle").value = cfg.surprise_enabled || "1";
+        document.getElementById("cfg-access-restriction").value = cfg.admin_access_restriction || "all";
+        document.getElementById("cfg-login-max-attempts").value = cfg.login_max_attempts || 5;
+        document.getElementById("cfg-login-lockout-minutes").value = cfg.login_lockout_minutes || 15;
 
         // Radio count_mode
         const countMode = cfg.count_mode || "leituras";
@@ -349,7 +353,10 @@
       sound_enabled: document.getElementById("cfg-sound").value,
       parent_unlock_code: document.getElementById("cfg-parent-code").value.trim().toUpperCase(),
       surprise_code: document.getElementById("cfg-surprise-code").value.trim().toUpperCase(),
-      surprise_enabled: document.getElementById("cfg-surprise-toggle").value
+      surprise_enabled: document.getElementById("cfg-surprise-toggle").value,
+      admin_access_restriction: document.getElementById("cfg-access-restriction").value,
+      login_max_attempts: document.getElementById("cfg-login-max-attempts").value,
+      login_lockout_minutes: document.getElementById("cfg-login-lockout-minutes").value
     };
 
     fetch("/api/admin/settings", {
@@ -659,6 +666,45 @@
       });
   });
 
+  // ----------------- TAB: DIAGNOSTICS ----------------- //
+  function loadDiagnostics() {
+    fetch("/api/admin/diagnostics")
+      .then((r) => r.json())
+      .then((d) => {
+        document.getElementById("diag-bipinho-version").textContent = d.version || "1.1.0";
+        document.getElementById("diag-disk-free").textContent = `${d.disk.free_gb} GB (${d.disk.percent_free}%)`;
+        document.getElementById("diag-db-status").textContent = d.database.ok ? "Saudável (OK)" : "Erro";
+        document.getElementById("diag-db-size").textContent = `${d.database.size_kb} KB`;
+        
+        const ffmpegAlert = document.getElementById("diag-ffmpeg-alert");
+        const ffmpegDetail = document.getElementById("diag-ffmpeg-detail");
+        if (d.ffmpeg.found) {
+          ffmpegAlert.style.display = "none";
+          ffmpegDetail.innerHTML = `<span style="color:#10b981;">✅ Instalado</span> — ${d.ffmpeg.version} (<code>${d.ffmpeg.path}</code>)`;
+        } else {
+          ffmpegAlert.className = "alert-error";
+          ffmpegAlert.style.display = "block";
+          ffmpegAlert.innerHTML = `⚠️ <strong>FFmpeg não encontrado!</strong> Vídeos que não sejam MP4 H.264 direto não poderão ser convertidos e miniaturas de vídeo podem falhar. Instale o FFmpeg ou coloque o executável no PATH do Windows.`;
+          ffmpegDetail.innerHTML = `<span style="color:#ef4444;">❌ Não encontrado</span> — ${d.ffmpeg.error || "Ausente no PATH"}`;
+        }
+
+        const sleepEl = document.getElementById("diag-sleep-status");
+        if (d.sleep.warning) {
+          sleepEl.innerHTML = `<span style="color:#f59e0b;">⚠️ ${d.sleep.message}</span>`;
+        } else {
+          sleepEl.innerHTML = `<span style="color:#10b981;">✅ ${d.sleep.message}</span>`;
+        }
+
+        document.getElementById("diag-tv-url").textContent = d.network.tv_url;
+      })
+      .catch((err) => console.error("Error loading diagnostics:", err));
+  }
+
+  const btnRefreshDiag = document.getElementById("btn-refresh-diag");
+  if (btnRefreshDiag) {
+    btnRefreshDiag.addEventListener("click", loadDiagnostics);
+  }
+
   // Helpers
   function formatDate(d) {
     if (!d) return "";
@@ -680,5 +726,6 @@
     loadAdminInfo();
     loadItems();
     loadSettings();
+    loadDiagnostics();
   });
 })();

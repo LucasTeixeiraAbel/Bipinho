@@ -40,7 +40,11 @@ DEFAULT_SETTINGS = {
     "surprise_code": "BIP-SURPRESA",
     
     # Security
-    "admin_password": "bipinho123",
+    "admin_password_hash": "",         # pbkdf2_sha256 hash
+    "admin_password_changed": "0",      # "0" means still default, must change
+    "admin_access_restriction": "all",  # "all" or "localhost_only"
+    "login_max_attempts": "5",          # Failed attempts before lockout
+    "login_lockout_minutes": "15",      # Lockout duration in minutes
     
     # Barcode Reader Profile (Active Type)
     "reader_type": "USB",              # "USB", "Bluetooth", "2.4G"

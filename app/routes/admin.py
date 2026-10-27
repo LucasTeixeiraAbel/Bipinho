@@ -20,7 +20,10 @@ from app.database import (
     get_all_settings, get_setting, set_setting, set_settings,
     get_stats, reset_session
 )
-from app.services.media_service import save_and_process_media
+from app.services.auth_service import hash_password, verify_password
+from app.services.rate_limiter import check_ip_lockout, record_login_failure, record_login_success
+from app.services.diagnostic_service import get_full_diagnostics, get_ffmpeg_info
+from app.services.media_service import save_and_process_media, is_ffmpeg_installed
 from app.services.session_manager import handle_barcode_scan, broadcast_event
 
 router = APIRouter()
@@ -28,11 +31,30 @@ router = APIRouter()
 # In-memory admin session tokens (valid for server lifetime)
 ACTIVE_ADMIN_SESSIONS = set()
 
+def get_client_ip(request: Request) -> str:
+    """Extracts client IP safely."""
+    forwarded = request.headers.get("X-Forwarded-For")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else "127.0.0.1"
+
+def check_ip_restriction(request: Request):
+    """Enforces localhost_only if configured in settings."""
+    restriction = get_setting("admin_access_restriction", "all")
+    if restriction == "localhost_only":
+        client_ip = get_client_ip(request)
+        if client_ip not in ("127.0.0.1", "::1", "localhost", "testclient"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Acesso administrativo restrito exclusivamente ao computador local (localhost)."
+            )
+
 def is_authenticated(request: Request) -> bool:
     token = request.cookies.get("bipinho_admin_auth")
     return token in ACTIVE_ADMIN_SESSIONS if token else False
 
 def require_auth(request: Request):
+    check_ip_restriction(request)
     if not is_authenticated(request):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -43,18 +65,46 @@ def require_auth(request: Request):
 
 @router.get("/admin/login", response_class=HTMLResponse)
 async def login_page(request: Request):
+    check_ip_restriction(request)
     if is_authenticated(request):
+        # If password still hasn't been changed, send to force-change
+        if get_setting("admin_password_changed", "0") == "0":
+            return RedirectResponse(url="/admin/trocar-senha-obrigatoria", status_code=303)
         return RedirectResponse(url="/admin", status_code=303)
     login_template = TEMPLATES_DIR / "login.html"
     return HTMLResponse(content=login_template.read_text(encoding="utf-8"))
 
 @router.post("/admin/login")
-async def do_login(password: str = Form(...)):
-    current_password = get_setting("admin_password", "bipinho123")
-    if password == current_password:
+async def do_login(request: Request, password: str = Form(...)):
+    check_ip_restriction(request)
+    client_ip = get_client_ip(request)
+    
+    # Check Rate Limiting lockout
+    is_locked, remaining = check_ip_lockout(client_ip)
+    if is_locked:
+        mins = max(1, remaining // 60)
+        template_text = (TEMPLATES_DIR / "login.html").read_text(encoding="utf-8")
+        error_html = f"<div class='alert-error'>Muitas tentativas incorretas. Acesso bloqueado temporariamente por mais {mins} minuto(s).</div>"
+        rendered = template_text.replace("<!-- ERROR_MESSAGE -->", error_html)
+        return HTMLResponse(content=rendered, status_code=429)
+
+    max_att = int(get_setting("login_max_attempts", "5"))
+    lockout_mins = int(get_setting("login_lockout_minutes", "15"))
+
+    saved_hash = get_setting("admin_password_hash", "")
+    # Check password
+    is_valid = verify_password(password, saved_hash)
+
+    if is_valid:
+        record_login_success(client_ip)
         token = secrets.token_hex(24)
         ACTIVE_ADMIN_SESSIONS.add(token)
-        response = RedirectResponse(url="/admin", status_code=303)
+        
+        # Check if first-login change is required
+        needs_change = get_setting("admin_password_changed", "0") == "0"
+        dest_url = "/admin/trocar-senha-obrigatoria" if needs_change else "/admin"
+        
+        response = RedirectResponse(url=dest_url, status_code=303)
         response.set_cookie(
             key="bipinho_admin_auth",
             value=token,
@@ -64,11 +114,52 @@ async def do_login(password: str = Form(...)):
         )
         return response
     else:
-        # Return login page with error
+        fails, now_locked, lock_sec = record_login_failure(client_ip, max_attempts=max_att, lockout_minutes=lockout_mins)
         template_text = (TEMPLATES_DIR / "login.html").read_text(encoding="utf-8")
-        error_html = "<div class='alert-error'>Senha incorreta. Tente novamente.</div>"
+        if now_locked:
+            error_html = f"<div class='alert-error'>Limite de {max_att} tentativas excedido! IP bloqueado por {lockout_mins} minutos.</div>"
+            code = 429
+        else:
+            left = max_att - fails
+            error_html = f"<div class='alert-error'>Senha incorreta. Restam {left} tentativa(s) antes do bloqueio temporário.</div>"
+            code = 401
         rendered = template_text.replace("<!-- ERROR_MESSAGE -->", error_html)
-        return HTMLResponse(content=rendered, status_code=401)
+        return HTMLResponse(content=rendered, status_code=code)
+
+@router.get("/admin/trocar-senha-obrigatoria", response_class=HTMLResponse)
+async def force_change_password_page(request: Request):
+    require_auth(request)
+    template_file = TEMPLATES_DIR / "force_password.html"
+    return HTMLResponse(content=template_file.read_text(encoding="utf-8"))
+
+@router.post("/admin/trocar-senha-obrigatoria")
+async def do_force_change_password(
+    request: Request,
+    new_password: str = Form(...),
+    confirm_password: str = Form(...)
+):
+    require_auth(request)
+    if new_password.strip() == "bipinho123":
+        template_text = (TEMPLATES_DIR / "force_password.html").read_text(encoding="utf-8")
+        rendered = template_text.replace("<!-- ERROR_MESSAGE -->", "<div class='alert-error'>A nova senha NÃO pode ser a senha padrão antiga (bipinho123). Escolha uma senha segura!</div>")
+        return HTMLResponse(content=rendered, status_code=400)
+    
+    if len(new_password.strip()) < 4:
+        template_text = (TEMPLATES_DIR / "force_password.html").read_text(encoding="utf-8")
+        rendered = template_text.replace("<!-- ERROR_MESSAGE -->", "<div class='alert-error'>A nova senha deve ter no mínimo 4 caracteres.</div>")
+        return HTMLResponse(content=rendered, status_code=400)
+
+    if new_password.strip() != confirm_password.strip():
+        template_text = (TEMPLATES_DIR / "force_password.html").read_text(encoding="utf-8")
+        rendered = template_text.replace("<!-- ERROR_MESSAGE -->", "<div class='alert-error'>A confirmação da nova senha não confere.</div>")
+        return HTMLResponse(content=rendered, status_code=400)
+
+    # Save new password hash & mark changed
+    new_hash = hash_password(new_password.strip())
+    set_setting("admin_password_hash", new_hash)
+    set_setting("admin_password_changed", "1")
+
+    return RedirectResponse(url="/admin", status_code=303)
 
 @router.get("/admin/logout")
 async def logout(request: Request):
@@ -83,19 +174,28 @@ async def logout(request: Request):
 
 @router.get("/admin", response_class=HTMLResponse)
 async def admin_dashboard(request: Request):
+    check_ip_restriction(request)
     if not is_authenticated(request):
         return RedirectResponse(url="/admin/login", status_code=303)
+    if get_setting("admin_password_changed", "0") == "0":
+        return RedirectResponse(url="/admin/trocar-senha-obrigatoria", status_code=303)
     admin_template = TEMPLATES_DIR / "admin.html"
     return HTMLResponse(content=admin_template.read_text(encoding="utf-8"))
 
 @router.get("/admin/imprimir", response_class=HTMLResponse)
 async def print_cards_page(request: Request):
+    check_ip_restriction(request)
     if not is_authenticated(request):
         return RedirectResponse(url="/admin/login", status_code=303)
     print_template = TEMPLATES_DIR / "print_cards.html"
     return HTMLResponse(content=print_template.read_text(encoding="utf-8"))
 
 # ----------------- ADMIN APIS ----------------- #
+
+@router.get("/api/admin/diagnostics")
+async def api_admin_diagnostics(request: Request):
+    require_auth(request)
+    return get_full_diagnostics()
 
 @router.get("/api/admin/info")
 async def api_admin_info(request: Request):
@@ -104,6 +204,7 @@ async def api_admin_info(request: Request):
     port = DEFAULT_PORT
     settings = get_all_settings()
     active_reader = settings.get("reader_type", "USB")
+    ffmpeg_status = get_ffmpeg_info()
     
     return {
         "tv_url": f"http://{lan_ip}:{port}",
@@ -111,7 +212,10 @@ async def api_admin_info(request: Request):
         "port": port,
         "reader_type": active_reader,
         "reader_tip": READER_TIPS.get(active_reader, ""),
-        "next_auto_code": get_next_available_code()
+        "next_auto_code": get_next_available_code(),
+        "ffmpeg_installed": ffmpeg_status["found"],
+        "ffmpeg_version": ffmpeg_status.get("version"),
+        "admin_access_restriction": settings.get("admin_access_restriction", "all")
     }
 
 @router.get("/api/admin/items")
@@ -139,6 +243,14 @@ async def api_create_item(
     existing = get_item_by_code(final_code)
     if existing:
         raise HTTPException(status_code=400, detail=f"O código '{final_code}' já está em uso!")
+
+    # Check ffmpeg if video is uploaded
+    file_ext = Path(file.filename or "").suffix.lower()
+    if file_ext in {".mkv", ".avi", ".mov", ".wmv", ".flv", ".webm"} and not is_ffmpeg_installed():
+        raise HTTPException(
+            status_code=400,
+            detail="O ffmpeg não está instalado no computador. Não é possível converter vídeos que não sejam MP4 direto. Por favor instale o ffmpeg ou envie arquivos .mp4 prontos."
+        )
 
     # Read bytes safely
     file_bytes = await file.read()
@@ -168,6 +280,7 @@ async def api_create_item(
         "status": "success",
         "item_id": item_id,
         "code": final_code,
+        "media_type": media_type,
         "warning": warning
     }
 
@@ -182,14 +295,15 @@ async def api_update_item(
     file: Optional[UploadFile] = File(None)
 ):
     require_auth(request)
-    existing = get_item_by_id(item_id)
-    if not existing:
+    current = get_item_by_id(item_id)
+    if not current:
         raise HTTPException(status_code=404, detail="Desenho não encontrado")
 
     clean_code = code.strip().upper()
-    other = get_item_by_code(clean_code)
-    if other and other["id"] != item_id:
-        raise HTTPException(status_code=400, detail=f"O código '{clean_code}' já pertence a outro desenho!")
+    if clean_code != current["code"]:
+        other = get_item_by_code(clean_code)
+        if other and other["id"] != item_id:
+            raise HTTPException(status_code=400, detail=f"O código '{clean_code}' já está em uso!")
 
     new_filename = None
     new_thumb = None
@@ -236,8 +350,10 @@ async def api_delete_item(item_id: int, request: Request):
 async def api_get_settings(request: Request):
     require_auth(request)
     settings = get_all_settings()
-    # Don't send plain password hash if not necessary, but this is a private local app
-    return settings
+    # Mask password hash from settings response
+    safe_settings = dict(settings)
+    safe_settings.pop("admin_password_hash", None)
+    return safe_settings
 
 class SettingsUpdateRequest(BaseModel):
     settings: Dict[str, Any]
@@ -246,6 +362,10 @@ class SettingsUpdateRequest(BaseModel):
 async def api_update_settings(payload: SettingsUpdateRequest, request: Request):
     require_auth(request)
     new_settings = payload.settings
+    
+    # Don't allow updating password directly via this endpoint
+    new_settings.pop("admin_password_hash", None)
+    new_settings.pop("admin_password", None)
     
     # Save to database
     set_settings(new_settings)
@@ -267,13 +387,15 @@ class ChangePasswordRequest(BaseModel):
 @router.post("/api/admin/change-password")
 async def api_change_password(payload: ChangePasswordRequest, request: Request):
     require_auth(request)
-    current_saved = get_setting("admin_password", "bipinho123")
-    if payload.current_password != current_saved:
+    saved_hash = get_setting("admin_password_hash", "")
+    if not verify_password(payload.current_password, saved_hash):
         raise HTTPException(status_code=400, detail="Senha atual incorreta")
     if len(payload.new_password.strip()) < 4:
         raise HTTPException(status_code=400, detail="A nova senha deve ter no mínimo 4 caracteres")
 
-    set_setting("admin_password", payload.new_password.strip())
+    new_hash = hash_password(payload.new_password.strip())
+    set_setting("admin_password_hash", new_hash)
+    set_setting("admin_password_changed", "1")
     return {"status": "success", "message": "Senha alterada com sucesso!"}
 
 @router.get("/api/admin/stats")

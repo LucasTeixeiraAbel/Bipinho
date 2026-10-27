@@ -60,6 +60,35 @@ def init_db():
                 (key, str(val))
             )
 
+        # Migration: Check if legacy plaintext admin_password exists and migrate to admin_password_hash
+        cur = conn.execute("SELECT value FROM settings WHERE key = 'admin_password'")
+        legacy_pwd_row = cur.fetchone()
+        cur_hash = conn.execute("SELECT value FROM settings WHERE key = 'admin_password_hash'").fetchone()
+        
+        from app.services.auth_service import hash_password
+        if legacy_pwd_row and legacy_pwd_row[0]:
+            legacy_val = legacy_pwd_row[0]
+            if not cur_hash or not cur_hash[0]:
+                conn.execute(
+                    "INSERT OR REPLACE INTO settings (key, value) VALUES ('admin_password_hash', ?)",
+                    (hash_password(legacy_val),)
+                )
+            # If the password was still default "bipinho123", ensure admin_password_changed is "0"
+            if legacy_val == "bipinho123":
+                conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('admin_password_changed', '0')")
+            else:
+                conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('admin_password_changed', '1')")
+            # Remove legacy plaintext key
+            conn.execute("DELETE FROM settings WHERE key = 'admin_password'")
+        else:
+            # If no hash exists at all, initialize with default "bipinho123" and changed="0"
+            if not cur_hash or not cur_hash[0]:
+                conn.execute(
+                    "INSERT OR REPLACE INTO settings (key, value) VALUES ('admin_password_hash', ?)",
+                    (hash_password("bipinho123"),)
+                )
+                conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('admin_password_changed', '0')")
+
         # Initialize session state row 1
         conn.execute("""
             INSERT OR IGNORE INTO session_state (

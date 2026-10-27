@@ -20,13 +20,17 @@ bipinho/
 │   │   ├── child.py              # Interface da TV (criança) e API de bipes
 │   │   └── media.py              # Streaming de vídeo com suporte a Range (RFC 7233)
 │   ├── services/
+│   │   ├── auth_service.py       # Hashing seguro de senhas com PBKDF2 e salt
 │   │   ├── barcode_service.py    # Geração de códigos de barras Code128 em SVG
+│   │   ├── diagnostic_service.py # Verificação de saúde, disco, FFmpeg e energia
 │   │   ├── media_service.py      # Conversão de vídeo com ffmpeg e miniaturas
+│   │   ├── rate_limiter.py       # Proteção contra ataques de força bruta no login
 │   │   └── session_manager.py    # Regras de estrelas, debounce, pausa e eventos SSE
 │   └── templates/
 │       ├── admin.html            # Dashboard administrativo com abas e diagnóstico
 │       ├── child.html            # Interface 10-foot UI para TV em tela cheia
-│       ├── login.html            # Tela de login da administração
+│       ├── force_password.html   # Tela obrigatória de troca de senha no 1º acesso
+│       ├── login.html            # Tela de login da administração com lockout
 │       └── print_cards.html      # Folha A4 pronta para impressão e recorte
 ├── data/
 │   └── bipinho.db                # Banco de dados SQLite (criado automaticamente)
@@ -38,11 +42,12 @@ bipinho/
 │   │   ├── admin.css             # Estilos do painel de controle
 │   │   └── child.css             # Estilos da TV (fontes grandes, cores vivas, estrelas)
 │   ├── js/
-│   │   ├── admin.js              # Lógica reativa da admin e teste do leitor
+│   │   ├── admin.js              # Lógica reativa da admin, diagnóstico e teste
 │   │   └── child.js              # Captura do leitor na TV, áudio sintetizado e SSE
 │   └── sounds/                   # Efeitos sonoros WAV offline
 ├── tests/
-│   └── test_bipinho.py           # Suíte de testes automatizados completa
+│   ├── test_bipinho.py           # Suíte de testes de fluxo e regressão (15 testes)
+│   └── test_etapa1.py            # Testes de segurança, hashing, rate limit e diagnóstico (6 testes)
 ├── iniciar_bipinho.bat           # Inicializador rápido (janela aberta)
 ├── iniciar_em_segundo_plano.vbs  # Inicializador silencioso (sem janela)
 ├── instalar_inicializacao_windows.bat # Configura início automático com o Windows
@@ -59,7 +64,12 @@ bipinho/
 ### Pré-requisitos
 - **Windows 10 ou 11**
 - **Python 3.10 ou superior** instalado (com a opção *"Add Python to PATH"* marcada)
-- **ffmpeg** (já detectado e configurado no sistema para conversão de vídeos)
+- **FFmpeg**: Essencial para conversão automática de vídeos para o perfil H.264 MP4 suportado pela TV e geração de miniaturas.
+  - **Instalação rápida via terminal (PowerShell / Prompt):**
+    ```powershell
+    winget install Gyan.FFmpeg
+    ```
+  - **Instalação manual:** Baixe a versão *essentials build* em [gyan.dev/ffmpeg/builds](https://www.gyan.dev/ffmpeg/builds/), descompacte (ex: `C:\ffmpeg`) e adicione o subdiretório `bin` à variável de ambiente `PATH` do Windows.
 
 ### Instalação das dependências
 Abra o prompt de comando ou PowerShell na pasta do projeto e execute:
@@ -179,7 +189,7 @@ O leitor de código de barras funciona exatamente como um teclado USB/Bluetooth:
 
 ## 🖨️ 6. Como Imprimir e Montar a Pastinha da Criança
 
-1. Abra a administração em `http://localhost:8000/admin` (ou pelo IP local) e faça login com a senha (`bipinho123`).
+1. Abra a administração em `http://localhost:8000/admin` (ou pelo IP local). No primeiro acesso à administração, faça login com a senha inicial fornecida na instalação. O sistema exigirá obrigatoriamente a criação de uma senha pessoal nova e segura, armazenada exclusivamente com hash salgado (PBKDF2).
 2. Clique no botão **"🖨️ Imprimir Folha A4 de Códigos"** (rota `/admin/imprimir`).
 3. Uma folha em layout A4 será montada com:
    - Título **Bipinho** no cabeçalho.
@@ -204,13 +214,39 @@ Na rota `/admin` você pode ajustar em tempo real:
 - **Perfil do Leitor (USB, 2.4G ou Bluetooth):** Troca imediata sem reiniciar o servidor.
 - **Simular Bipe:** Permite testar a TV remotamente digitando o código ou clicando em "Bipar na TV" em qualquer desenho cadastrado.
 - **Estatísticas:** Lista com os desenhos mais vistos e contagem total de visualizações.
-- **Troca de Senha:** Altere a senha padrão (`bipinho123`) a qualquer momento.
+- **Troca de Senha:** Altere a sua senha de acesso a qualquer momento com confirmação e hash PBKDF2.
 
 ---
 
-## 🧪 8. Testes Automatizados
+## 🛡️ 8. Segurança & Diagnóstico do Sistema
 
-O sistema inclui uma suíte completa de testes cobrindo streaming com Range, geração de SVG, leitura de bipes, debounce, bloqueio de pausa, desbloqueio dos pais, autenticação e perfil do leitor:
+O Bipinho conta com uma camada robusta de proteção familiar e monitoramento técnico contínuo:
+
+- **Troca Obrigatória de Senha no 1º Acesso:** Impede o uso contínuo de credenciais padrão. No primeiro login, o sistema bloqueia o acesso ao painel até que uma senha pessoal nova e segura seja definida.
+- **Armazenamento Criptográfico Seguro:** Senhas nunca são salvas em texto puro; utiliza-se **PBKDF2-HMAC-SHA256** com 100.000 iterações e salt aleatório individual de 16 bytes por senha.
+- **Proteção contra Força Bruta (Rate Limiting por IP):** Bloqueio temporário automático de 15 minutos (configurável) após 5 tentativas incorretas consecutivas vindas do mesmo IP, impedindo ataques automatizados.
+- **Restrição de Acesso à Administração:** Opção de limitar o painel `/admin` exclusivamente ao computador servidor (`localhost_only`), bloqueando tentativas de acesso a partir de celulares, tablets ou da própria TV na rede doméstica.
+- **Aba de Diagnóstico Técnico (`/admin`):**
+  - **Detecção do FFmpeg:** Identifica se o binário está no PATH, exibindo a versão ou alerta explicativo com passos de instalação.
+  - **Espaço Livre em Disco:** Mede o armazenamento disponível na partição do servidor em GB e porcentagem.
+  - **Integridade do Banco SQLite:** Executa `PRAGMA integrity_check` e reporta a saúde e tamanho do arquivo `.db`.
+  - **Alerta de Suspensão de Energia:** Detecta se o Windows está configurado para suspender a atividade ao ficar ocioso na tomada, alertando para evitar quedas no sinal da TV.
+
+---
+
+## 🧪 9. Testes Automatizados
+
+O sistema inclui suítes completas de testes automatizados com cobertura total:
+
+### Testes de Segurança & Diagnóstico (Etapa 1)
+Valida PBKDF2 com salt, obrigatoriedade de troca de senha no 1º acesso, bloqueio por força bruta (rate limiting), restrição de IP para localhost, API de diagnóstico e alertas de FFmpeg:
+```bash
+python -m tests.test_etapa1
+```
+Resultado: **6/6 testes aprovados com sucesso.**
+
+### Testes de Fluxo Completo e Regras de Negócio
+Cobre streaming com Range RFC 7233, geração de códigos de barra SVG, leitura de bipes, debounce, contagem de sessões, pausa, desbloqueio secreto dos pais, autenticação e perfil do leitor:
 ```bash
 python -m tests.test_bipinho
 ```

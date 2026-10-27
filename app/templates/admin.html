@@ -57,6 +57,7 @@
       <button class="tab-btn" data-tab="tab-reader">🏷️ Leitor de Código</button>
       <button class="tab-btn" data-tab="tab-tester">⚡ Testar Leitor</button>
       <button class="tab-btn" data-tab="tab-stats">📊 Estatísticas & Favoritos</button>
+      <button class="tab-btn" data-tab="tab-diagnostics">🩺 Diagnóstico</button>
     </nav>
 
     <!-- Main Content Area -->
@@ -247,6 +248,36 @@
                   <option value="1">Ativado</option>
                   <option value="0">Desativado</option>
                 </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-group">
+            <h3>Restrição de Acesso à Administração</h3>
+            <div class="form-row">
+              <div class="form-group flex-1">
+                <label for="cfg-access-restriction">Permitir acesso ao /admin</label>
+                <select id="cfg-access-restriction">
+                  <option value="all">Rede Local e PC (Qualquer dispositivo da casa)</option>
+                  <option value="localhost_only">Apenas no PC Servidor (Bloquear acesso de TVs, celulares e tablets)</option>
+                </select>
+                <small class="field-hint">Se escolher "Apenas no PC Servidor", a rota /admin só abrirá pelo computador local (localhost / 127.0.0.1).</small>
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-group">
+            <h3>Segurança de Login & Bloqueio por Tentativas</h3>
+            <div class="form-row">
+              <div class="form-group flex-1">
+                <label for="cfg-login-max-attempts">Máximo de Tentativas Incorretas</label>
+                <input type="number" id="cfg-login-max-attempts" min="3" max="20" value="5" required>
+                <small class="field-hint">Tentativas com senha errada antes de bloquear o IP temporariamente (padrão: 5).</small>
+              </div>
+              <div class="form-group flex-1">
+                <label for="cfg-login-lockout-minutes">Tempo de Bloqueio Temporário (minutos)</label>
+                <input type="number" id="cfg-login-lockout-minutes" min="1" max="120" value="15" required>
+                <small class="field-hint">Minutos que o IP ficará bloqueado após atingir o limite (padrão: 15 min).</small>
               </div>
             </div>
           </div>
@@ -455,6 +486,44 @@
           <h3>Ranking dos Desenhos Favoritos</h3>
           <div id="favorites-list" class="favorites-list">
             <!-- Populated via JS -->
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= TAB: DIAGNOSTICS ================= -->
+      <section id="tab-diagnostics" class="tab-pane">
+        <div class="pane-header">
+          <div>
+            <h2>🩺 Diagnóstico do Servidor e Sistema</h2>
+            <p>Verifique a saúde técnica, codecs de vídeo, banco de dados e energia do PC.</p>
+          </div>
+          <button id="btn-refresh-diag" class="btn btn-secondary">🔄 Atualizar Diagnóstico</button>
+        </div>
+
+        <div id="diag-ffmpeg-alert" style="display:none; margin-bottom: 20px;"></div>
+
+        <div class="stats-overview">
+          <div class="stat-card">
+            <span class="stat-number" id="diag-bipinho-version">1.1.0</span>
+            <span class="stat-title">Versão do Bipinho</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-number" id="diag-disk-free">-- GB</span>
+            <span class="stat-title">Espaço Livre em Disco</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-number" id="diag-db-status">--</span>
+            <span class="stat-title">Estado do Banco SQLite</span>
+          </div>
+        </div>
+
+        <div class="card mt-24">
+          <h3>Detalhes do Ambiente</h3>
+          <div class="media-meta-line" style="font-size:15px; line-height: 2; margin-top: 10px;">
+            <div><strong>🎬 FFmpeg:</strong> <span id="diag-ffmpeg-detail">Verificando...</span></div>
+            <div><strong>💾 Caminho do Banco:</strong> <span id="diag-db-path">bipinho.db</span> (<span id="diag-db-size">-- KB</span>)</div>
+            <div><strong>⚡ Suspensão do Windows:</strong> <span id="diag-sleep-status">Verificando...</span></div>
+            <div><strong>🌐 Endereço da TV:</strong> <code id="diag-tv-url">--</code></div>
           </div>
         </div>
       </section>
