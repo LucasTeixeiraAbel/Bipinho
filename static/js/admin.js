@@ -140,7 +140,7 @@
         return `
         <div class="media-item-card">
           <div class="media-thumb-wrapper">
-            <img src="${thumbUrl}" alt="${item.title}" onerror="this.src='/static/icons/default_thumb.png'">
+            <img src="${thumbUrl}" alt="${item.title}" onerror="this.src='/static/icons/default_thumb.svg'">
             ${typeBadge}
             <span class="badge-code">${item.code}</span>
           </div>

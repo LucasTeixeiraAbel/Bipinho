@@ -9,7 +9,7 @@ O sistema funciona **100% offline** (sem internet, sem CDN externa) e roda em re
 ## 🚀 Estrutura do Projeto
 
 ```text
-desenhos/
+bipinho/
 ├── app/
 │   ├── config.py                 # Configurações, pastas e detecção de IP local
 │   ├── database.py               # Banco de dados SQLite, tabelas e consultas
